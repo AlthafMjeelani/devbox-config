@@ -1,0 +1,675 @@
+#!/usr/bin/env bash
+#
+# gate - our own AI ship-gate. Validates a branch in a disposable worktree, then
+# pushes and opens a PR only after the gate passes. Our own take on no-mistakes;
+# no external binary, built on `git-wt` + `opencode`/`claude`/`codex`/`kimi`/`amp`/`commandcode`/`antigravity` + `gh`.
+#
+# Pipeline (per `gate run`):
+#   1. Copy the current branch's HEAD into a disposable worktree (your work stays put).
+#   2. review  - structured: the reviewer emits JSON findings classified auto_fix vs
+#                ask_user. auto_fix findings are applied automatically; ask_user findings
+#                are gated on human approval (prompted interactively, or blocked when
+#                headless). An evidence trail is written under GATE_EVIDENCE_DIR.
+#   3. test    - explicit command if configured, else agent-detected validation.
+#   4. docs    - explicit command if configured, else skipped by default.
+#   5. lint    - explicit command if configured, else agent-detected validation.
+#   6. On pass: fast-forward push to the remote and `gh pr create`. Auto-fix commits
+#      (if any) are fast-forwarded back onto your local branch.
+#   7. CI monitor (opt-in): watch the PR's checks; on failure, auto-fix from the logs,
+#      push, and re-watch, bounded by GATE_MAX_ROUNDS.
+#   8. Tear down the disposable worktree.
+#
+# Usage:
+#   gate init [--engine opencode|claude|codex|kimi|amp|commandcode|antigravity]
+#                      Seed optional .gate.sh overrides in the current repo.
+#   gate run [branch]  Run the gate for <branch> (default: current branch).
+#   gate status        Show the resolved config.
+#   gate help
+#
+# Config: optional sourced `.gate.sh` overrides at the repo root (bash, not YAML).
+# Requires: git-wt (PATH), jq, gh (for the PR/CI), and whatever checks the agent detects.
+
+set -euo pipefail
+
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+AMP_GATE_SETTINGS="${GATE_AMP_SETTINGS:-$SCRIPT_DIR/../share/agentic/amp-settings.json}"
+AMP_GUARD_PLUGIN="$HOME/.config/amp/plugins/workflow-guardrails.ts"
+COMMANDCODE_GUARD_HOOK="$HOME/.commandcode/hooks/crew-guard.sh"
+
+die() { printf 'gate: %s\n' "$*" >&2; exit 1; }
+info() { printf '\033[1;34m▸ %s\033[0m\n' "$*"; }
+ok()   { printf '\033[1;32m✔ %s\033[0m\n' "$*"; }
+warn() { printf '\033[1;33m! %s\033[0m\n' "$*" >&2; }
+
+require_amp_guard() {
+	[ -r "$AMP_GUARD_PLUGIN" ] || { warn "Amp workflow guard plugin not found: $AMP_GUARD_PLUGIN"; return 1; }
+}
+
+require_commandcode_guard() {
+	[ -x "$COMMANDCODE_GUARD_HOOK" ] || { warn "CommandCode crew guard hook not found: $COMMANDCODE_GUARD_HOOK (run: make restow-commandcode)"; return 1; }
+}
+
+agent_output_failed() {
+	grep -qiE 'auto-rejecting|user rejected permission|permission requested:|^✗ |Error: The user rejected permission' <<< "$1"
+}
+
+repo_root() {
+	git rev-parse --show-toplevel 2>/dev/null || die "not inside a git repository"
+}
+
+# --- config -----------------------------------------------------------------
+
+# Defaults; a repo's .gate.sh may override these. Empty test/lint means agent detection.
+GATE_TEST=""
+GATE_LINT=""
+GATE_DOCS=""
+GATE_REVIEW_CMD='gate_review_opencode'
+GATE_REVIEW_APPROVE=1
+GATE_FIX_CMD='opencode run "$GATE_PROMPT" --agent build --auto'   # GATE_PROMPT contains the fix prompt
+GATE_MAX_ROUNDS=3
+GATE_EVIDENCE_DIR=".gate/evidence"
+GATE_WATCH_CI=0
+GATE_PUSH_REMOTE="origin"
+GATE_PR_ARGS="--fill"
+
+load_config() {
+	local cfg; cfg="$(repo_root)/.gate.sh"
+	# shellcheck source=/dev/null
+	[ -f "$cfg" ] && source "$cfg"
+	case "$GATE_REVIEW_CMD" in
+		'opencode run "/gate-review" --agent reviewer'|'opencode run "/gate-review"')
+			GATE_REVIEW_CMD='gate_review_opencode'
+			;;
+	esac
+	case "$GATE_FIX_CMD" in
+		'opencode run "%s" --agent build'|'opencode run "%s" --agent build --auto')
+			GATE_FIX_CMD='opencode run "$GATE_PROMPT" --agent build --auto'
+			;;
+	esac
+	return 0   # a missing .gate.sh must not fail the caller under `set -e`
+}
+
+# --- init -------------------------------------------------------------------
+
+cmd_init() {
+	local engine="opencode"
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			--engine) shift; engine="${1:-}" ;;
+			-*) die "unknown flag: $1" ;;
+			*) die "unexpected argument: $1" ;;
+		esac
+		shift
+	done
+	local review_cmd fix_cmd
+	case "$engine" in
+		opencode)
+			review_cmd='gate_review_opencode'
+			fix_cmd='opencode run "$GATE_PROMPT" --agent build --auto'
+			;;
+		claude)
+			review_cmd='claude -p "/gate-review" --output-format text'
+			fix_cmd='claude -p "$GATE_PROMPT" --output-format text'
+			;;
+		codex)
+			review_cmd='codex exec "Use the gate-review skill on the current branch diff; output only the JSON"'
+			fix_cmd='codex exec "$GATE_PROMPT"'
+			;;
+		kimi)
+			review_cmd='gate_review_kimi'
+			fix_cmd='gate_fix_kimi'
+			;;
+		amp)
+			review_cmd='gate_review_amp'
+			fix_cmd='gate_fix_amp'
+			;;
+		commandcode)
+			review_cmd='gate_review_commandcode'
+			fix_cmd='gate_fix_commandcode'
+			;;
+		antigravity|agy)
+			review_cmd='gate_review_antigravity'
+			fix_cmd='gate_fix_antigravity'
+			;;
+		*) die "unknown engine: $engine" ;;
+	esac
+	local cfg; cfg="$(repo_root)/.gate.sh"
+	[ -e "$cfg" ] && die ".gate.sh already exists at $cfg"
+	cat > "$cfg" <<EOF
+# .gate.sh - optional ship-gate overrides (sourced by \`gate\`). Plain bash, not YAML.
+# Leave test/lint empty for agent auto-detection. Leave docs empty to skip by default.
+
+GATE_TEST=""
+GATE_DOCS=""
+GATE_LINT=""
+
+# Examples:
+# GATE_TEST="pnpm test"
+# GATE_LINT="pnpm lint"
+# GATE_DOCS="pnpm docs:check"
+# GATE_DOCS="npx markdown-link-check README.md"
+# GATE_DOCS='opencode run "check docs cover this diff; update them if not" --agent docs-writer'
+
+# Structured review: the command must output JSON findings (auto_fix vs ask_user).
+# auto_fix findings are applied automatically; ask_user findings are gated (below).
+GATE_REVIEW_CMD='$review_cmd'
+# Alternatives:
+# GATE_REVIEW_CMD='gate_review_opencode'
+# GATE_REVIEW_CMD='claude -p "/gate-review" --output-format text'
+# GATE_REVIEW_CMD='codex exec "Use the gate-review skill on the current branch diff; output only the JSON"'
+# GATE_REVIEW_CMD='gate_review_kimi'
+# GATE_REVIEW_CMD='gate_review_amp'
+# GATE_REVIEW_CMD='gate_review_commandcode'
+
+# 1 = ask_user findings need human approval before shipping (prompted interactively;
+#     blocked when headless). 0 = informational only, never blocks.
+GATE_REVIEW_APPROVE=1
+
+# How auto-fixes are requested. The failing-stage / fix prompt is passed in GATE_PROMPT.
+GATE_FIX_CMD='$fix_cmd'
+# Alternatives:
+# GATE_FIX_CMD='opencode run "\$GATE_PROMPT" --agent build --auto'
+# GATE_FIX_CMD='claude -p "\$GATE_PROMPT" --output-format text'
+# GATE_FIX_CMD='codex exec "\$GATE_PROMPT"'
+# GATE_FIX_CMD='gate_fix_kimi'
+# GATE_FIX_CMD='gate_fix_amp'
+# GATE_FIX_CMD='gate_fix_commandcode'
+
+GATE_MAX_ROUNDS=3                    # auto-fix attempts per enforced stage / CI
+GATE_EVIDENCE_DIR=".gate/evidence"   # review evidence trail (gitignored)
+GATE_WATCH_CI=0                      # 1 = watch CI after the PR and auto-fix failures
+GATE_PUSH_REMOTE="origin"
+GATE_PR_ARGS="--fill"                # extra args for \`gh pr create\`
+EOF
+	ok "wrote $cfg"
+	# Keep the evidence trail out of git.
+	local gi; gi="$(repo_root)/.gitignore"
+	if ! { [ -f "$gi" ] && grep -qxF '.gate/' "$gi"; }; then
+		printf '.gate/\n' >> "$gi"
+		ok "added .gate/ to .gitignore"
+	fi
+	printf '  Optional overrides written. gate run also works without .gate.sh.\n'
+}
+
+# --- run --------------------------------------------------------------------
+
+# Run one enforced stage with a bounded auto-fix loop. Returns non-zero if it
+# still fails after GATE_MAX_ROUNDS.
+run_enforced() {
+	local name="$1" cmd="$2"
+	[ -n "$cmd" ] || { info "skip $name (not configured)"; return 0; }
+
+	local round=0 out fix_prompt
+	while :; do
+		info "$name (round $round): $cmd"
+		if out=$(eval "$cmd" 2>&1); then
+			printf '%s\n' "$out" | tail -5
+			if agent_output_failed "$out"; then
+				warn "$name reported permission/tool errors despite a zero exit status"
+				return 1
+			fi
+			ok "$name passed"
+			return 0
+		fi
+		printf '%s\n' "$out" | tail -30
+		round=$((round + 1))
+		if [ "$round" -gt "$GATE_MAX_ROUNDS" ]; then
+			warn "$name still failing after $GATE_MAX_ROUNDS auto-fix rounds - escalating"
+			return 1
+		fi
+		warn "$name failed - attempting auto-fix (round $round/$GATE_MAX_ROUNDS)"
+		fix_prompt="The '$name' stage failed. Fix the code so it passes. Output:
+$out"
+		run_fix_command "$fix_prompt" || warn "auto-fix command errored (continuing to re-check)"
+		# git status --porcelain catches new/untracked files too (git diff does not).
+		if [ -n "$(git status --porcelain)" ]; then
+			git add -A && git commit -q -m "gate: auto-fix $name (round $round)"
+			ok "committed auto-fix for $name"
+		else
+			warn "auto-fix produced no changes"
+		fi
+	done
+}
+
+# Ask the build agent to detect and run the right validation for a stage. This is
+# the default path when deterministic commands are not configured in .gate.sh.
+run_agent_stage() {
+	local name="$1" prompt round=0 out
+	case "$name" in
+		test)
+			prompt="Detect this repository's relevant test commands from the actual files, run the appropriate tests for the current diff, fix safe failures if needed, and re-run until they pass. Do not push, open PRs, or edit unrelated code."
+			;;
+		lint)
+			prompt="Detect this repository's relevant lint, format, static analysis, or typecheck commands from the actual files, run the appropriate checks for the current diff, fix safe issues if needed, and re-run until they pass. Do not push, open PRs, or edit unrelated code."
+			;;
+		*) die "unknown agent stage: $name" ;;
+	esac
+
+	while :; do
+		info "$name (round $round): agent auto-detect"
+		out=$(run_fix_command "$prompt" 2>&1) && {
+			printf '%s\n' "$out" | tail -20
+			if agent_output_failed "$out"; then
+				warn "$name agent reported permission/tool errors despite a zero exit status"
+				return 1
+			fi
+			if [ -n "$(git status --porcelain)" ]; then
+				git add -A && git commit -q -m "gate: auto-fix $name (round $round)"
+				ok "committed agent changes for $name"
+			fi
+			ok "$name passed"
+			return 0
+		}
+		printf '%s\n' "$out" | tail -30
+		round=$((round + 1))
+		if [ "$round" -gt "$GATE_MAX_ROUNDS" ]; then
+			warn "$name still failing after $GATE_MAX_ROUNDS agent rounds - escalating"
+			return 1
+		fi
+		warn "$name failed - retrying agent validation (round $round/$GATE_MAX_ROUNDS)"
+		if [ -n "$(git status --porcelain)" ]; then
+			git add -A && git commit -q -m "gate: auto-fix $name (round $round)"
+			ok "committed agent changes for $name"
+		fi
+	done
+}
+
+run_stage() {
+	local name="$1" cmd="$2"
+	if [ -n "$cmd" ]; then
+		run_enforced "$name" "$cmd"
+		return
+	fi
+	case "$name" in
+		test|lint) run_agent_stage "$name" ;;
+		docs) info "skip docs (not configured)" ;;
+		*) die "unknown stage: $name" ;;
+	esac
+}
+
+# Apply one fix request via GATE_FIX_CMD and commit if it changed anything.
+# Args: <commit-message> <fix-prompt>. Echoes the short sha on success (empty if no-op).
+run_fix_command() {
+	local prompt="$1" cmd
+	if [[ "$GATE_FIX_CMD" == *%s* ]]; then
+		# Backward compatibility for old .gate.sh commands. Substitute a variable reference,
+		# not the raw prompt, so shell metacharacters in findings are never re-parsed.
+		# shellcheck disable=SC2059
+		cmd=$(printf "$GATE_FIX_CMD" '$GATE_PROMPT')
+	else
+		cmd="$GATE_FIX_CMD"
+	fi
+	GATE_PROMPT="$prompt" eval "$cmd"
+}
+
+apply_fix() {
+	local msg="$1" prompt="$2"
+	# Fix output goes to stderr so only the resulting sha lands on stdout for the caller.
+	run_fix_command "$prompt" >&2 || warn "fix command errored"
+	# git status --porcelain catches new/untracked files too (git diff does not).
+	if [ -n "$(git status --porcelain)" ]; then
+		git add -A && git commit -q -m "$msg" >&2
+		git rev-parse --short HEAD
+	fi
+}
+
+# Structured review + human-approval gate. Runs with cwd = the gate worktree.
+# Returns 0 to continue the ship, non-zero to abort it.
+gate_review_prompt() {
+	local base diff
+	base=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo origin/main)
+	diff=$(git diff "$(git merge-base "$base" HEAD 2>/dev/null || echo "$base")"...HEAD 2>/dev/null | sed -n '1,4000p')
+	cat <<EOF
+Review this branch's committed changes for the ship gate and output findings as a single JSON object.
+
+Rules:
+- Output only JSON - no prose, no markdown fences, nothing before or after.
+- Shape: {"findings":[{"id":"F1","severity":"high|medium|low","class":"auto_fix|ask_user","file":"path/to/file","line":0,"summary":"one-line problem","suggested_fix":"concrete instruction"}]}
+- If there is nothing to flag, output {"findings":[]}.
+- auto_fix means safe, mechanical, and unambiguous.
+- ask_user means the finding needs human judgment, including logic, security, performance, architecture, public API, or behavior decisions.
+- Be conservative with auto_fix. When in doubt, classify as ask_user.
+- suggested_fix must be specific enough to apply directly.
+
+Diff (branch vs its base):
+$diff
+EOF
+}
+
+gate_review_opencode() {
+	# Pure mode prevents optional skills from producing permission prompts in headless runs.
+	# Review overrides build's model: classifying auto_fix vs ask_user is judgment, not mechanical
+	# like the fixes, so it runs a reasoning notch above GATE_FIX_CMD.
+	opencode run "$(gate_review_prompt)" --agent build --model openai/gpt-5.6-terra --auto --pure
+}
+
+gate_review_kimi() {
+	# K3 handles the judgment-heavy review. stream-json keeps thinking and progress off
+	# stdout; select the final Assistant message so the gate receives only its JSON payload.
+	kimi --model kimi-code/k3 -p "$(gate_review_prompt)" --output-format stream-json 2>/dev/null \
+		| jq -sr '[.[] | select(.role == "assistant" and (.content | type == "string")) | .content] | last // ""'
+}
+
+gate_review_amp() {
+	[ -r "$AMP_GATE_SETTINGS" ] || { warn "Amp safety settings not found: $AMP_GATE_SETTINGS"; return 1; }
+	require_amp_guard || return 1
+	amp --settings-file "$AMP_GATE_SETTINGS" --no-notifications -m medium \
+		--plugin-ready-timeout 10 -x "$(gate_review_prompt)"
+}
+
+gate_fix_kimi() {
+	# Regular K2.7 is the reliable coding model for bounded mechanical fixes. Kimi print
+	# mode uses auto permissions, so reinforce the gate's local-only safety boundary.
+	kimi --model kimi-code/kimi-for-coding -p "$GATE_PROMPT
+
+Work only in the current disposable worktree. Do not push, open or modify pull requests,
+use sudo, rewrite Git history, delete the worktree, or perform outward-facing actions."
+}
+
+gate_fix_amp() {
+	[ -r "$AMP_GATE_SETTINGS" ] || { warn "Amp safety settings not found: $AMP_GATE_SETTINGS"; return 1; }
+	require_amp_guard || return 1
+	amp --settings-file "$AMP_GATE_SETTINGS" --no-notifications -m medium \
+		--plugin-ready-timeout 10 -x "$GATE_PROMPT
+
+Work only in the current disposable worktree. Do not push, open or modify pull requests,
+use sudo, rewrite Git history, delete the worktree, or perform outward-facing actions."
+}
+
+gate_review_commandcode() {
+	# Qwen3.7-Max (the deep tier) handles the judgment-heavy review. -p print mode is
+	# read-only, so no --yolo is needed here; plain-text output is fine - run_review strips
+	# fences and extracts the final findings JSON.
+	commandcode -p "$(gate_review_prompt)" --model Qwen/Qwen3.7-Max --skip-onboarding -t 2>/dev/null
+}
+
+gate_fix_commandcode() {
+	# Mechanical fixes need writes, which -p allows only under --yolo, so bound the run with
+	# CREW_MANAGED (the guard hook denies push/sudo/hard-reset/clean/rm). Fail closed if the
+	# hook is missing rather than run unbounded. Standard tier (DeepSeek V4 Pro) for the fixes.
+	require_commandcode_guard || return 1
+	CREW_MANAGED=1 commandcode -p "$GATE_PROMPT
+
+Work only in the current disposable worktree. Do not push, open or modify pull requests,
+use sudo, rewrite Git history, delete the worktree, or perform outward-facing actions." \
+		--model deepseek/deepseek-v4-pro --yolo --skip-onboarding -t
+}
+
+gate_review_antigravity() {
+	local bin="agy"
+	command -v agy >/dev/null 2>&1 || bin="antigravity"
+	"$bin" -p "$(gate_review_prompt)" --model gemini-3.1-pro-high --dangerously-skip-permissions 2>/dev/null
+}
+
+gate_fix_antigravity() {
+	local bin="agy"
+	command -v agy >/dev/null 2>&1 || bin="antigravity"
+	CREW_MANAGED=1 "$bin" -p "$GATE_PROMPT
+
+Work only in the current disposable worktree. Do not push, open or modify pull requests,
+use sudo, rewrite Git history, delete the worktree, or perform outward-facing actions." \
+		--model gemini-3.6-flash-high --dangerously-skip-permissions
+}
+
+run_review() {
+	local root="$1" branch="$2"
+	[ -n "$GATE_REVIEW_CMD" ] || { info "skip review (not configured)"; return 0; }
+
+	info "review: $GATE_REVIEW_CMD"
+	local raw json
+	raw=$(eval "$GATE_REVIEW_CMD" 2>&1 || true)
+	# Strip markdown fences, then fall back to the final JSON findings object.
+	# Agent tool logs and source diffs can contain unrelated braces before the result.
+	json=$(printf '%s\n' "$raw" | sed -e 's/^```json[[:space:]]*//' -e 's/^```[[:space:]]*//' -e 's/```[[:space:]]*$//')
+	if ! printf '%s' "$json" | jq -e '.findings' >/dev/null 2>&1; then
+		json=$(printf '%s\n' "$raw" | grep -E '^\{"findings":' | tail -1 || true)
+	fi
+	if ! printf '%s' "$json" | jq -e '.findings' >/dev/null 2>&1; then
+		warn "review did not return parseable JSON - blocking the ship"
+		printf '%s\n' "$raw" | tail -40
+		return 1
+	fi
+
+	local ts ev
+	ts=$(date +%Y%m%d-%H%M%S)
+	ev="$root/${GATE_EVIDENCE_DIR:-.gate/evidence}/${ts}-$(printf '%s' "$branch" | tr '/:' '__')"
+	mkdir -p "$ev"
+	printf '%s\n' "$json" | jq '.' > "$ev/review.json" 2>/dev/null || printf '%s\n' "$json" > "$ev/review.json"
+	printf '# Gate review - %s (%s)\n\n' "$branch" "$ts" > "$ev/summary.md"
+
+	local n_auto n_ask
+	n_auto=$(printf '%s' "$json" | jq '[.findings[]|select(.class=="auto_fix")]|length')
+	n_ask=$(printf '%s' "$json" | jq '[.findings[]|select(.class=="ask_user")]|length')
+	info "review findings: $n_auto auto-fix, $n_ask ask-user (evidence: ${ev#"$root"/})"
+
+	# --- auto_fix: apply all in one pass ---
+	if [ "$n_auto" -gt 0 ]; then
+		local fixlist sha
+		fixlist=$(printf '%s' "$json" | jq -r '.findings[]|select(.class=="auto_fix")|"- [\(.id)] \(.file):\(.line) \(.summary) -> \(.suggested_fix)"')
+		info "applying $n_auto auto-fix finding(s)"
+		sha=$(apply_fix "gate: auto-fix review findings" "Apply these safe, mechanical review fixes and nothing else:
+$fixlist")
+		[ -n "$sha" ] && ok "committed review auto-fixes ($sha)" || warn "auto-fix produced no changes"
+		printf '## Auto-fixed (commit: %s)\n%s\n\n' "${sha:-none}" "$fixlist" >> "$ev/summary.md"
+	fi
+
+	# --- ask_user: approval gate ---
+	[ "$n_ask" -gt 0 ] || return 0
+	printf '## Ask-user (needs judgment)\n' >> "$ev/summary.md"
+
+	local list
+	list=$(printf '%s' "$json" | jq -r '.findings[]|select(.class=="ask_user")|"  [\(.id)] \(.severity) \(.file):\(.line) - \(.summary)"')
+
+	if [ "${GATE_REVIEW_APPROVE:-1}" != "1" ]; then
+		warn "$n_ask ask-user finding(s) - informational (GATE_REVIEW_APPROVE=0):"
+		printf '%s\n' "$list"
+		printf '%s\n' "$list" | sed 's/^ */- /;s/$/ (informational)/' >> "$ev/summary.md"
+		return 0
+	fi
+
+	if [ ! -t 0 ]; then
+		warn "$n_ask ask-user finding(s) need approval, but no TTY (headless) - blocking the ship:"
+		printf '%s\n' "$list"
+		printf '%s\n' "$list" | sed 's/^ */- /;s/$/ -> BLOCKED (headless)/' >> "$ev/summary.md"
+		printf '\nRe-run `gate run` in a terminal to approve.\n' >> "$ev/summary.md"
+		return 1
+	fi
+
+	# interactive: prompt per finding
+	local ids id sev file line summary sfix ans sha
+	ids=$(printf '%s' "$json" | jq -r '.findings[]|select(.class=="ask_user")|.id')
+	while IFS= read -r id; do
+		[ -n "$id" ] || continue
+		sev=$(printf '%s' "$json" | jq -r --arg i "$id" '.findings[]|select(.id==$i)|.severity')
+		file=$(printf '%s' "$json" | jq -r --arg i "$id" '.findings[]|select(.id==$i)|.file')
+		line=$(printf '%s' "$json" | jq -r --arg i "$id" '.findings[]|select(.id==$i)|.line')
+		summary=$(printf '%s' "$json" | jq -r --arg i "$id" '.findings[]|select(.id==$i)|.summary')
+		sfix=$(printf '%s' "$json" | jq -r --arg i "$id" '.findings[]|select(.id==$i)|.suggested_fix')
+		printf '\n\033[1;33mask-user [%s] %s  %s:%s\033[0m\n  %s\n  suggested: %s\n' "$id" "$sev" "$file" "$line" "$summary" "$sfix"
+		printf '  [a]pprove & ship / [f]ix now / [b]lock ? '
+		read -r ans </dev/tty || ans="b"
+		case "$ans" in
+			a|A) printf -- '- [%s] %s:%s %s -> APPROVED\n' "$id" "$file" "$line" "$summary" >> "$ev/summary.md" ;;
+			f|F)
+				sha=$(apply_fix "gate: fix review finding $id" "Apply this review fix and nothing else: [$id] $file:$line - $summary -> $sfix")
+				if [ -n "$sha" ]; then
+					ok "committed fix for $id ($sha)"
+					printf -- '- [%s] %s:%s %s -> FIXED (%s)\n' "$id" "$file" "$line" "$summary" "$sha" >> "$ev/summary.md"
+				else
+					warn "fix produced no changes for $id"
+					printf -- '- [%s] %s:%s %s -> FIX NO-OP\n' "$id" "$file" "$line" "$summary" >> "$ev/summary.md"
+				fi
+				;;
+			*)
+				warn "blocked on $id - aborting the ship"
+				printf -- '- [%s] %s:%s %s -> BLOCKED\n' "$id" "$file" "$line" "$summary" >> "$ev/summary.md"
+				return 1
+				;;
+		esac
+	done <<< "$ids"
+	return 0
+}
+
+# Watch CI on the PR; on failure pull the failing logs, auto-fix in the gate worktree,
+# push, and re-watch. Bounded by GATE_MAX_ROUNDS. Returns non-zero if CI is still red.
+watch_ci() {
+	local root="$1" branch="$2" wt="$3"
+	[ "${GATE_WATCH_CI:-0}" = "1" ] || return 0
+	command -v gh >/dev/null 2>&1 || { warn "gh not installed - cannot watch CI"; return 0; }
+
+	local gate_branch="gate/$branch" round=0 out run_id logs sha
+	while :; do
+		info "watching CI for $branch (round $round)"
+		if out=$( cd "$root" && gh pr checks "$branch" --watch --fail-fast 2>&1 ); then
+			printf '%s\n' "$out" | tail -5
+			ok "CI passed"
+			return 0
+		fi
+		if printf '%s' "$out" | grep -qiE 'no checks|no commit statuses'; then
+			warn "no CI checks configured - skipping CI monitor"
+			return 0
+		fi
+		printf '%s\n' "$out" | tail -20
+		round=$((round + 1))
+		if [ "$round" -gt "$GATE_MAX_ROUNDS" ]; then
+			warn "CI still failing after $GATE_MAX_ROUNDS auto-fix rounds - PR left open (red)"
+			return 1
+		fi
+		warn "CI failed - attempting auto-fix (round $round/$GATE_MAX_ROUNDS)"
+		run_id=$( cd "$root" && gh run list --branch "$branch" --limit 1 --json databaseId --jq '.[0].databaseId' 2>/dev/null || true )
+		logs=""
+		[ -n "$run_id" ] && logs=$( cd "$root" && gh run view "$run_id" --log-failed 2>/dev/null | tail -100 || true )
+		[ -n "$logs" ] || logs="CI failed for $branch; inspect the PR checks."
+		sha=$( cd "$wt" && apply_fix "gate: auto-fix CI (round $round)" "CI is failing for this branch. Fix the code so the checks pass. Failing log:
+$logs" )
+		if [ -n "$sha" ]; then
+			info "pushing CI fix ($sha)"
+			git -C "$root" push "$GATE_PUSH_REMOTE" "$gate_branch:refs/heads/$branch"
+			git -C "$root" merge --ff-only "$gate_branch" >/dev/null 2>&1 || true
+			ok "pushed CI fix (round $round)"
+		else
+			warn "CI auto-fix produced no changes - PR left open (red)"
+			return 1
+		fi
+	done
+}
+
+cmd_run() {
+	local root; root=$(repo_root)
+	load_config
+	command -v git-wt >/dev/null 2>&1 || die "git-wt not on PATH"
+	command -v jq >/dev/null 2>&1 || die "jq not on PATH (needed for structured review)"
+
+	local branch
+	branch="${1:-$(git -C "$root" rev-parse --abbrev-ref HEAD)}"
+	[ "$branch" != "HEAD" ] || die "detached HEAD - check out a branch first"
+
+	local default_branch
+	default_branch=$(git -C "$root" symbolic-ref --quiet --short refs/remotes/"$GATE_PUSH_REMOTE"/HEAD 2>/dev/null | sed 's#.*/##' || true)
+	[ "$branch" = "${default_branch:-main}" ] && die "refusing to gate the default branch ($branch)"
+
+	# Require the branch's work to be committed - the gate validates commits.
+	git -C "$root" diff --quiet && git -C "$root" diff --cached --quiet \
+		|| die "commit or stash your changes first (the gate validates committed work)"
+
+	local gate_branch="gate/$branch" wt
+	info "creating disposable worktree from $branch"
+	git -C "$root" wt rm "$gate_branch" --force >/dev/null 2>&1 || true
+	git -C "$root" wt new "$gate_branch" "$branch" >/dev/null
+	wt=$(git -C "$root" wt path "$gate_branch")
+
+	local rc=0
+	(
+		cd "$wt"
+		local fail=0
+		# 2. structured review + human-approval gate (exit 2 = review blocked)
+		run_review "$root" "$branch" || exit 2
+		# 3-5. validation stages - run all so every failure surfaces, then fail if any did.
+		run_stage test "$GATE_TEST" || fail=1
+		run_stage docs "$GATE_DOCS" || fail=1
+		run_stage lint "$GATE_LINT" || fail=1
+		exit "$fail"
+	) || rc=$?
+
+	if [ "$rc" -ne 0 ]; then
+		[ "$rc" -eq 2 ] \
+			&& warn "review gate blocked the ship - nothing pushed. Disposable worktree kept:" \
+			|| warn "gate did not pass - nothing pushed. Disposable worktree kept for inspection:"
+		printf '    %s\n' "$wt"
+		printf '    (clean up with: git wt rm %s --force -D)\n' "$gate_branch"
+		exit 1
+	fi
+
+	ok "all gates passed"
+
+	# 6a. Best-effort: fast-forward the local branch to the validated commits.
+	if git -C "$root" merge --ff-only "$gate_branch" >/dev/null 2>&1; then
+		ok "fast-forwarded local $branch to the validated commits"
+	else
+		warn "could not fast-forward local $branch - remote will be authoritative; run: git pull --ff-only"
+	fi
+
+	# 6b. Push the validated commits to the remote branch.
+	info "pushing validated commits to $GATE_PUSH_REMOTE/$branch"
+	git -C "$root" push "$GATE_PUSH_REMOTE" "$gate_branch:refs/heads/$branch"
+	git -C "$root" branch --set-upstream-to="$GATE_PUSH_REMOTE/$branch" "$branch" >/dev/null 2>&1 || true
+
+	# 6c. Open a PR (best-effort; requires gh).
+	if command -v gh >/dev/null 2>&1; then
+		if pr_url=$( cd "$root" && gh pr view --head "$branch" --json url --jq .url 2>/dev/null ); then
+			ok "PR already exists: $pr_url"
+		else
+			info "opening PR"
+			( cd "$root" && gh pr create --head "$branch" $GATE_PR_ARGS ) || warn "gh pr create failed (open the PR manually)"
+		fi
+	else
+		warn "gh not installed - pushed, but open the PR manually"
+	fi
+
+	# 7. CI monitor (opt-in) - may auto-fix + re-push, so it runs before teardown.
+	local ci_rc=0
+	watch_ci "$root" "$branch" "$wt" || ci_rc=$?
+
+	# 8. Teardown.
+	info "cleaning up disposable worktree"
+	git -C "$root" wt rm "$gate_branch" --force -D >/dev/null 2>&1 || true
+
+	if [ "$ci_rc" -ne 0 ]; then
+		warn "shipped, but CI is red for $branch - fix the PR"
+		exit 1
+	fi
+	ok "shipped: $branch"
+}
+
+cmd_status() {
+	load_config
+	printf 'repo:            %s\n' "$(repo_root)"
+	printf 'config:          %s\n' "$([ -f "$(repo_root)/.gate.sh" ] && echo "$(repo_root)/.gate.sh" || echo '(optional - no .gate.sh)')"
+	printf 'GATE_TEST:       %s\n' "${GATE_TEST:-<auto>}"
+	printf 'GATE_DOCS:       %s\n' "${GATE_DOCS:-<skip>}"
+	printf 'GATE_LINT:       %s\n' "${GATE_LINT:-<auto>}"
+	printf 'GATE_REVIEW:     %s\n' "${GATE_REVIEW_CMD:-<skip>}"
+	printf 'GATE_REVIEW_APPROVE: %s\n' "$GATE_REVIEW_APPROVE"
+	printf 'GATE_FIX_CMD:    %s\n' "$GATE_FIX_CMD"
+	printf 'GATE_EVIDENCE_DIR: %s\n' "$GATE_EVIDENCE_DIR"
+	printf 'GATE_WATCH_CI:   %s\n' "$GATE_WATCH_CI"
+	printf 'GATE_MAX_ROUNDS: %s\n' "$GATE_MAX_ROUNDS"
+	printf 'GATE_PUSH_REMOTE: %s\n' "$GATE_PUSH_REMOTE"
+}
+
+cmd_help() { awk 'NR==1{next} /^#/{sub(/^#[ ]?/,""); print; next} {exit}' "$0"; }
+
+main() {
+	local sub="${1:-help}"; shift || true
+	case "$sub" in
+		init)           cmd_init "$@" ;;
+		run)            cmd_run "$@" ;;
+		status)         cmd_status "$@" ;;
+		help|-h|--help) cmd_help ;;
+		*) die "unknown command: $sub (try: gate help)" ;;
+	esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+	main "$@"
+fi

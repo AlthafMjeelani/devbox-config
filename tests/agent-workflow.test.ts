@@ -1,0 +1,445 @@
+import { describe, expect, test } from "bun:test";
+import {
+  existsSync,
+  lstatSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
+
+import workflowGuardrails, {
+  blockedCommandReason,
+  createLifecycleReporter,
+  herdrReportingEnabled,
+  orbSandboxEnabled,
+} from "../amp/.config/amp/plugins/workflow-guardrails";
+
+const repo = resolve(import.meta.dir, "..");
+
+describe("shared skill installation", () => {
+  test("syncs shared skill directories into Codex's user scope without replacing third-party skills", () => {
+    const home = mkdtempSync(resolve(tmpdir(), "agents-sync-"));
+    const thirdParty = resolve(home, ".agents/skills/basecamp");
+    const legacySkill = resolve(home, ".codex/skills/code-review/SKILL.md");
+    const systemMarker = resolve(home, ".codex/skills/.system/marker");
+    mkdirSync(thirdParty, { recursive: true });
+    mkdirSync(resolve(legacySkill, ".."), { recursive: true });
+    mkdirSync(resolve(systemMarker, ".."), { recursive: true });
+    symlinkSync(resolve(repo, "agents/.codex/skills/code-review/SKILL.md"), legacySkill);
+    writeFileSync(systemMarker, "system");
+
+    try {
+      const result = Bun.spawnSync([resolve(repo, "scripts/.local/bin/agents-sync")], {
+        cwd: repo,
+        env: { ...process.env, HOME: home },
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      expect(result.exitCode, result.stderr.toString()).toBe(0);
+      expect(readlinkSync(resolve(home, ".agents/skills/code-review"))).toContain(
+        "agents/.config/opencode/skills/code-review",
+      );
+      expect(existsSync(thirdParty)).toBe(true);
+      expect(existsSync(resolve(home, ".agents/skills/.system"))).toBe(false);
+      expect(() => lstatSync(legacySkill)).toThrow();
+      expect(existsSync(systemMarker)).toBe(true);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("OpenCode subagent permissions", () => {
+  const config = JSON.parse(readFileSync(resolve(repo, "opencode/.config/opencode/opencode.json"), "utf8"));
+
+  test("allows routine read-only Git inspection outside the build agent", () => {
+    expect(config.permission.bash).toMatchObject({
+      "*": "ask",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "git branch*": "allow",
+      "git remote*": "allow",
+      "git merge-base*": "allow",
+      "git rev-parse*": "allow",
+    });
+  });
+});
+
+describe("Amp workflow guardrails", () => {
+  test.each([
+    "git push origin main",
+    "/usr/bin/git push origin main",
+    "git -C /tmp/repo push origin feature",
+    "git reset --hard HEAD~1",
+    "git clean -fdx",
+    "git branch -D feature",
+    "git branch --delete --force feature",
+    "git branch -df feature",
+    "git --no-pager push origin main",
+    String.raw`g\it push origin main`,
+    String.raw`git pu\sh origin main`,
+    "sudo apt install package",
+    String.raw`s\udo apt install package`,
+    "/usr/bin/sudo apt install package",
+    "rm -rf /",
+    'rm -fr "/"',
+    "rm -r -f $HOME",
+    'rm --recursive --force "$HOME/cache"',
+    "bash -c 'git push origin main'",
+    "printf ok && git push origin main",
+  ])("blocks %s", (command) => {
+    expect(blockedCommandReason(command)).not.toBeNull();
+  });
+
+  test.each([
+    "git status --short",
+    "git diff --check",
+    "git clean -nfd",
+    "rm -rf ./build",
+    "rg sudo docs",
+    "printf '%s\\n' 'git push origin main'",
+    "bun test",
+  ])("allows %s", (command) => {
+    expect(blockedCommandReason(command)).toBeNull();
+  });
+
+  test("allows sandbox-local elevation in Amp orbs without weakening shared-state guards", () => {
+    const orbPolicy = { allowSandboxElevation: true };
+    expect(blockedCommandReason("sudo apt-get install -y docker", orbPolicy)).toBeNull();
+    expect(blockedCommandReason("bash -c 'sudo apt-get update'", orbPolicy)).toBeNull();
+    expect(blockedCommandReason("git push origin main", orbPolicy)).not.toBeNull();
+    expect(blockedCommandReason("git reset --hard HEAD~1", orbPolicy)).not.toBeNull();
+    expect(blockedCommandReason("rm -rf $HOME", orbPolicy)).not.toBeNull();
+  });
+
+  test("detects Amp's documented orb environment", () => {
+    expect(orbSandboxEnabled({ AMP_ORB: "1" })).toBe(true);
+    expect(orbSandboxEnabled({})).toBe(false);
+  });
+});
+
+describe("Amp plugin integration", () => {
+  test("registers shell policy for both shell tool shapes", async () => {
+    let toolHandler: ((event: any, context: any) => Promise<any>) | undefined;
+    const amp = {
+      on(event: string, handler: any) {
+        if (event === "tool.call") toolHandler = handler;
+      },
+      helpers: {
+        shellCommandFromToolCall(event: any) {
+          const command = event.input.command ?? event.input.cmd;
+          return command ? { command } : null;
+        },
+      },
+      activeThread: { current: null },
+    };
+    workflowGuardrails(amp as any);
+
+    const context = { ui: { confirm: () => Promise.resolve(false) } };
+    for (const [tool, input] of [
+      ["shell_command", { command: "git push origin main" }],
+      ["Bash", { cmd: "git branch --delete --force feature" }],
+    ] as const) {
+      const result = await toolHandler?.(
+        { toolUseID: "tool-test", tool, input, thread: { id: "thread-test" } },
+        context,
+      );
+      expect(result?.action).toBe("reject-and-continue");
+    }
+  });
+
+  test("serializes overlapping Herdr lifecycle reports", async () => {
+    const reports: string[] = [];
+    let releaseFirst: (() => void) | undefined;
+    const firstReport = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let calls = 0;
+    const lifecycle = createLifecycleReporter(async (state) => {
+      calls += 1;
+      if (calls === 1) await firstReport;
+      reports.push(state);
+    });
+
+    const first = lifecycle.start("thread-a", "turn-a");
+    const second = lifecycle.start("thread-b", "turn-b");
+    const firstEnd = lifecycle.end("thread-a", "turn-a", "done");
+    const secondEnd = lifecycle.end("thread-b", "turn-b", "done");
+    expect(reports).toEqual([]);
+    releaseFirst?.();
+    await Promise.all([first, second, firstEnd, secondEnd]);
+    expect(reports).toEqual(["working", "working", "working", "idle"]);
+  });
+
+  test("leaves Crew-managed Herdr panes to the Crew reporter", () => {
+    expect(herdrReportingEnabled({ HERDR_ENV: "1", HERDR_PANE_ID: "w1:p1", CREW_MANAGED: "1" })).toBe(false);
+    expect(herdrReportingEnabled({ HERDR_ENV: "1", HERDR_PANE_ID: "w1:p1" })).toBe(true);
+  });
+});
+
+describe("Crew Amp execution", () => {
+  const crew = readFileSync(resolve(repo, "scripts/.local/bin/crew"), "utf8");
+  const callCrewFunction = (body: string) => {
+    const result = Bun.spawnSync(["bash", "-c", `source "$1"; ${body}`, "test", resolve(repo, "scripts/.local/bin/crew")]);
+    expect(result.exitCode).toBe(0);
+    return result.stdout.toString();
+  };
+
+  test("streams concise Claude activity without thinking or tool results", () => {
+    const events = [
+      { type: "system", subtype: "init" },
+      {
+        type: "assistant",
+        message: {
+          content: [
+            { type: "thinking", thinking: "private reasoning" },
+            { type: "text", text: "I am checking the migration." },
+            { type: "tool_use", name: "Bash", input: { description: "Run focused database tests", command: "bun test" } },
+            { type: "tool_use", name: "Edit", input: { file_path: "src/store.ts" } },
+          ],
+        },
+      },
+      { type: "user", message: { content: [{ type: "tool_result", content: "very long output" }] } },
+      { type: "result", subtype: "success", result: "Finished" },
+    ];
+    const input = events.map((event) => JSON.stringify(event)).join("\n");
+    const encoded = Buffer.from(input).toString("base64");
+    const output = callCrewFunction(`printf %s '${encoded}' | base64 -d | claude_stream_filter`);
+
+    expect(output).toBe([
+      "[started] Claude session",
+      "[agent] I am checking the migration.",
+      "[Bash] Run focused database tests",
+      "[Edit] src/store.ts",
+      "[done] Claude finished",
+      "",
+    ].join("\n"));
+    expect(output).not.toContain("private reasoning");
+    expect(output).not.toContain("very long output");
+  });
+
+  test("launches Claude with realtime streaming output", () => {
+    const command = callCrewFunction("claude_headless_command sonnet 'finish task'");
+    expect(command).toContain("claude -p --model sonnet");
+    expect(command).toContain("--output-format stream-json --verbose");
+    expect(command).toContain("jq --unbuffered");
+    expect(command).toContain("set -o pipefail");
+  });
+
+  test("uses execute mode for Amp headless runs", () => {
+    const command = callCrewFunction("amp_headless_command medium 'finish task'");
+    expect(command).toContain("CREW_MANAGED=1 amp --settings-file");
+    expect(command).toContain("--plugin-ready-timeout 10 -x");
+  });
+
+  test("propagates bounded auto-approval to every OpenCode subagent", () => {
+    const settingsPath = resolve(repo, "scripts/.local/share/agentic/opencode-crew-settings.json");
+    const command = callCrewFunction(`OPENCODE_CREW_SETTINGS='${settingsPath}'; opencode_headless_command openai/gpt-5.6-terra 'finish task'`);
+    expect(command).toContain("CREW_MANAGED=1 OPENCODE_CONFIG_CONTENT=");
+    expect(command).toContain("opencode run --model openai/gpt-5.6-terra");
+    expect(command).toContain("--agent build --auto");
+
+    const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+    expect(settings.permission).toMatchObject({
+      edit: "allow",
+      external_directory: "allow",
+      webfetch: "allow",
+      bash: {
+        "*": "allow",
+        "git push*": "deny",
+        "git reset --hard*": "deny",
+        "git clean -f*": "deny",
+        "sudo*": "deny",
+        "rm -rf /*": "deny",
+        "rm -rf ~*": "deny",
+        "rm -rf $HOME*": "deny",
+      },
+    });
+    expect(settings.agent).toBeUndefined();
+  });
+
+  test("runs every tasked Herdr crewmate headlessly", () => {
+    for (const engine of ["amp", "opencode", "claude", "codex", "kimi", "commandcode", "antigravity"]) {
+      expect(callCrewFunction(`should_run_headless task && printf ${engine}`)).toBe(engine);
+    }
+  });
+
+  test("launches tasked Herdr crewmates through a bounded wrapper command", () => {
+    expect(crew).toContain('launcher="$sdir/run.sh"');
+    expect(crew).toContain("printf '#!/usr/bin/env bash\\n%s\\n' \"$wrapped\" > \"$launcher\"");
+    expect(crew).toContain('herdr pane run "$pane" "$(printf \'bash %q\' "$launcher")"');
+    expect(crew).not.toContain('herdr pane run "$pane" "$wrapped"');
+  });
+
+  test("maps the deep Amp profile to high", () => {
+    expect(callCrewFunction("resolve_profile deep amp")).toBe("high");
+  });
+
+  test("keeps the Codex fast model and reasoning effort separate", () => {
+    expect(callCrewFunction("resolve_profile fast codex")).toBe("gpt-5.6-luna");
+    const headless = callCrewFunction("codex_headless_command gpt-5.6-luna fast 'finish task'");
+    const interactive = callCrewFunction("codex_interactive_command gpt-5.6-luna fast");
+    expect(headless).toContain("codex exec --model gpt-5.6-luna");
+    expect(headless).toContain("model_reasoning_effort=low");
+    expect(interactive).toContain("codex --model gpt-5.6-luna");
+    expect(interactive).toContain("model_reasoning_effort=low");
+    expect(headless).not.toContain("luna-low");
+  });
+
+  test("does not override Codex reasoning effort outside the fast profile", () => {
+    expect(callCrewFunction("codex_headless_command gpt-5.6-terra standard 'finish task'")).not.toContain(
+      "model_reasoning_effort",
+    );
+  });
+
+  test("does not apply unattended settings to interactive Amp", () => {
+    const command = callCrewFunction("amp_interactive_command medium");
+    expect(command).toBe("amp -m medium");
+    expect(command).not.toContain("--settings-file");
+    expect(callCrewFunction("should_run_headless '' || printf interactive")).toBe("interactive");
+  });
+
+  test("reports failed Herdr crewmates as blocked", () => {
+    expect(crew).toContain("[ \\$rc -eq 0 ] || state=blocked");
+  });
+
+  test("fails closed when the deployed Amp plugin is missing", () => {
+    const emptyHome = resolve(repo, ".tmp-missing-amp-plugin");
+    const result = Bun.spawnSync(
+      ["bash", "-c", 'source "$1"; require_amp_guard', "test", resolve(repo, "scripts/.local/bin/crew")],
+      { env: { ...process.env, HOME: emptyHome }, stdout: "pipe", stderr: "pipe" },
+    );
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr.toString()).toContain("Amp workflow guard plugin not found");
+
+    const gateResult = Bun.spawnSync(
+      ["bash", "-c", 'source "$1"; require_amp_guard', "test", resolve(repo, "scripts/.local/bin/gate")],
+      { env: { ...process.env, HOME: emptyHome }, stdout: "pipe", stderr: "pipe" },
+    );
+    expect(gateResult.exitCode).not.toBe(0);
+    expect(gateResult.stderr.toString()).toContain("Amp workflow guard plugin not found");
+  });
+});
+
+describe("Crew CommandCode execution", () => {
+  const callCrewFunction = (body: string) => {
+    const result = Bun.spawnSync(["bash", "-c", `source "$1"; ${body}`, "test", resolve(repo, "scripts/.local/bin/crew")]);
+    expect(result.exitCode).toBe(0);
+    return result.stdout.toString();
+  };
+
+  test("maps CommandCode profiles to cost-tiered models", () => {
+    expect(callCrewFunction("resolve_profile fast commandcode")).toBe("deepseek/deepseek-v4-flash");
+    expect(callCrewFunction("resolve_profile standard commandcode")).toBe("deepseek/deepseek-v4-pro");
+    expect(callCrewFunction("resolve_profile deep commandcode")).toBe("Qwen/Qwen3.7-Max");
+  });
+
+  test("runs headless CommandCode bounded by --yolo + the CREW_MANAGED guard", () => {
+    const command = callCrewFunction("commandcode_headless_command deepseek/deepseek-v4-pro 'finish task'");
+    expect(command).toContain("CREW_MANAGED=1 commandcode -p");
+    expect(command).toContain("--model deepseek/deepseek-v4-pro");
+    expect(command).toContain("--yolo");
+    expect(command).toContain("--skip-onboarding -t");
+  });
+
+  test("does not apply --yolo to interactive CommandCode", () => {
+    const command = callCrewFunction("commandcode_interactive_command deepseek/deepseek-v4-pro");
+    expect(command).toBe("commandcode --model deepseek/deepseek-v4-pro");
+    expect(command).not.toContain("--yolo");
+  });
+
+  test("fails closed when the CommandCode guard hook is missing", () => {
+    const emptyHome = resolve(repo, ".tmp-missing-commandcode-hook");
+    for (const script of ["scripts/.local/bin/crew", "scripts/.local/bin/gate"]) {
+      const result = Bun.spawnSync(
+        ["bash", "-c", 'source "$1"; require_commandcode_guard', "test", resolve(repo, script)],
+        { env: { ...process.env, HOME: emptyHome }, stdout: "pipe", stderr: "pipe" },
+      );
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr.toString()).toContain("CommandCode crew guard hook not found");
+    }
+  });
+});
+
+describe("CommandCode crew guard hook", () => {
+  const hook = resolve(repo, "commandcode/.commandcode/hooks/crew-guard.sh");
+  const runHook = (payload: string, env: Record<string, string> = {}) => {
+    const result = Bun.spawnSync(["bash", hook], {
+      stdin: Buffer.from(payload),
+      env: { ...process.env, ...env },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    return result.stdout.toString();
+  };
+  const denied = (out: string) => out.includes('"permissionDecision":"deny"');
+
+  test("blocks outward/destructive commands under CREW_MANAGED", () => {
+    for (const command of ["git push origin HEAD", "sudo rm -rf /etc", "git reset --hard HEAD~1", "git clean -fdx", "rm -rf build"]) {
+      expect(denied(runHook(JSON.stringify({ tool_input: { command } }), { CREW_MANAGED: "1" }))).toBe(true);
+    }
+  });
+
+  test("allows ordinary commands under CREW_MANAGED", () => {
+    for (const command of ["git commit -m wip", "git add -A", "bun test", "npm run build"]) {
+      expect(denied(runHook(JSON.stringify({ tool_input: { command } }), { CREW_MANAGED: "1" }))).toBe(false);
+    }
+  });
+
+  test("is a no-op outside CREW_MANAGED so interactive sessions are unaffected", () => {
+    expect(runHook(JSON.stringify({ tool_input: { command: "git push origin HEAD" } }))).toBe("");
+  });
+
+  test("fails closed: malformed input under CREW_MANAGED is denied", () => {
+    expect(denied(runHook("not json at all", { CREW_MANAGED: "1" }))).toBe(true);
+  });
+});
+
+describe("Crew Antigravity execution", () => {
+  const callCrewFunction = (body: string) => {
+    const result = Bun.spawnSync(["bash", "-c", `source "$1"; ${body}`, "test", resolve(repo, "scripts/.local/bin/crew")]);
+    expect(result.exitCode).toBe(0);
+    return result.stdout.toString();
+  };
+
+  test("accepts the installed agy binary without an antigravity alias", () => {
+    const result = Bun.spawnSync(
+      [
+        "bash",
+        "-c",
+        'source "$1"; bin=$(mktemp -d); trap \'rm -rf "$bin"\' EXIT; printf "#!/usr/bin/env bash\\n" > "$bin/agy"; chmod +x "$bin/agy"; PATH="$bin:/usr/bin:/bin" require_engine_command antigravity',
+        "test",
+        resolve(repo, "scripts/.local/bin/crew"),
+      ],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    expect(result.exitCode).toBe(0);
+  });
+
+  test("maps Antigravity profiles to Gemini model tiers", () => {
+    expect(callCrewFunction("resolve_profile fast antigravity")).toBe("gemini-3.6-flash-low");
+    expect(callCrewFunction("resolve_profile standard antigravity")).toBe("gemini-3.6-flash-high");
+    expect(callCrewFunction("resolve_profile deep antigravity")).toBe("gemini-3.1-pro-high");
+  });
+
+  test("launches headless Antigravity bounded by CREW_MANAGED + --dangerously-skip-permissions", () => {
+    const command = callCrewFunction("antigravity_headless_command gemini-3.6-flash-high 'finish task'");
+    expect(command).toContain("CREW_MANAGED=1 agy -p");
+    expect(command).toContain("--model gemini-3.6-flash-high");
+    expect(command).toContain("--dangerously-skip-permissions");
+  });
+
+  test("launches interactive Antigravity without print or permission flags", () => {
+    const command = callCrewFunction("antigravity_interactive_command gemini-3.6-flash-high");
+    expect(command).toBe("agy --model gemini-3.6-flash-high");
+    expect(command).not.toContain("-p");
+    expect(command).not.toContain("--dangerously-skip-permissions");
+  });
+});

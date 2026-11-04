@@ -1,0 +1,152 @@
+# vim: filetype=zsh
+
+
+# Setup fzf
+# ---------
+source <(fzf --zsh)
+
+resetdate() {
+    sudo date -s "$(wget -qSO- --max-redirect=0 google.com 2>&1 | grep Date: | cut -d' ' -f5-8)Z"
+}
+
+# lazy loading asdf for faster startup
+asdf() {
+    unset -f asdf
+    source "$HOME/.asdf/asdf.sh"
+    asdf "$@"
+}
+
+
+# (optional) completions without sourcing asdf.sh
+# plus our own completions dir (crew, git-wt, wt).
+fpath=("$HOME/.config/zsh/completions" "$HOME/.asdf/completions" $fpath)
+autoload -Uz compinit && compinit
+
+t_s(){
+    ~/devbox-config/zsh/.config/zsh/tmux-sessionizer.sh
+}
+
+zle -N fzf-file-widget
+
+bindkey -s '^f' 't_s\n'
+bindkey -M vicmd '\ef' fzf-file-widget
+bindkey -M viins '\ef' fzf-file-widget
+
+bindkey '^l' autosuggest-accept
+bindkey '\e[A' history-beginning-search-backward
+bindkey '\e[B' history-beginning-search-forward
+# bindkey '^o' up-line-or-history
+
+function mkcd() { mkdir -p "$@" && cd "$_"; }
+
+# ---------------------------------------------------------------
+# Restart the Noctalia (Quickshell) shell without re-logging in.
+# Useful after installing/updating app icons, since Qt caches the
+# icon theme at startup and only re-scans on a fresh process.
+# ---------------------------------------------------------------
+noctalia-reload() {
+    # Refresh the user icon cache first (no-op if nothing changed)
+    gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null
+
+    # Remember the currently running instances before we spawn a new one
+    local old_pids=$(pgrep -f 'qs -c noctalia-shell')
+
+    # Start a fresh, detached instance so it survives the old one dying
+    setsid qs -c noctalia-shell >/dev/null 2>&1 < /dev/null & disown
+    sleep 2
+
+    # Kill only the previously running instances
+    [[ -n "$old_pids" ]] && echo "$old_pids" | xargs -r kill 2>/dev/null
+
+    echo "🔄 Noctalia reloaded"
+}
+
+# ---------------------------------------------------------------
+# function to encrypt secrets
+# ---------------------------------------------------------------
+encrypt_secrets() {
+    local plain="${HOME}/secrets.env"
+    local crypt="${HOME}/.config/zsh/secrets.gpg.env"
+
+    if [[ ! -f "$plain" ]]; then
+        echo "❌ Plain secrets file not found: $plain"
+        return 1
+    fi
+
+    # Get fingerprint directly
+    local fingerprint=$(gpg --list-keys --with-colons --fingerprint | awk -F: '$1=="fpr" {print $10; exit}')
+    
+    if [[ -z "$fingerprint" ]]; then
+        echo "❌ No GPG fingerprint found"
+        return 1
+    fi
+
+    echo "Found fingerprint: $fingerprint"
+    
+    # Get the user ID for display
+    local uid=$(gpg --list-keys --with-colons | awk -F: '$1=="uid" {print $10; exit}')
+    echo "For key: $uid"
+
+    if [[ -f "$crypt" ]]; then
+        if [[ -n "$ZSH_VERSION" ]]; then
+            read "ans?Overwrite existing encrypted file? [y/N] "
+        else
+            read -p "Overwrite existing encrypted file? [y/N] " ans
+        fi
+        [[ "$ans" =~ ^[Yy] ]] || return 0
+    fi
+
+    # Try sops encryption
+    echo "Encrypting with sops..."
+    if sops --encrypt --pgp "$fingerprint" --output "$crypt" "$plain"; then
+        chmod 600 "$crypt"
+        echo "✅ Secrets encrypted to: $crypt"
+    else
+        echo "❌ sops failed. Trying alternative approaches..."
+        
+        # Try with SOPS_PGP_FP environment variable
+        echo "Trying with environment variable..."
+        if SOPS_PGP_FP="$fingerprint" sops --encrypt --output "$crypt" "$plain"; then
+            chmod 600 "$crypt"
+            echo "✅ Secrets encrypted to: $crypt"
+        else
+            echo "❌ All encryption attempts failed"
+            echo "💡 You may need to create ~/.sops.yaml with:"
+            echo "creation_rules:"
+            echo "  - pgp: '$fingerprint'"
+            return 1
+        fi
+    fi
+}
+
+# ---------------------------------------------------------------
+# Helper function to load secrets
+# ---------------------------------------------------------------
+load_secrets() {
+    if [[ -f "$HOME/.config/zsh/secrets.gpg.env" ]] && [[ -z "$SECRETS_LOADED" ]]; then
+        if sops -d "$HOME/.config/zsh/secrets.gpg.env" >/dev/null 2>&1; then
+            set -a
+            source <(sops -d "$HOME/.config/zsh/secrets.gpg.env" |
+                     grep -E '^[A-Za-z_][A-Za-z0-9_]*=')
+            set +a
+            export SECRETS_LOADED=1
+            echo "✅ Secrets loaded successfully"
+        else
+            echo "❌ Could not decrypt secrets file"
+            return 1
+        fi
+    # elif [[ -n "$SECRETS_LOADED" ]]; then
+    #     echo "✅ Secrets already loaded"
+    fi
+}
+
+# ---------------------------------------------------------------
+# Auto-load secrets for opencode only
+# ---------------------------------------------------------------
+# opencode() {
+#     # Load secrets if not already loaded
+#     [[ -z "$SECRETS_LOADED" ]] && load_secrets
+#
+#     # Run the actual opencode command
+#     command opencode "$@"
+# }

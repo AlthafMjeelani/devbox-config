@@ -1,0 +1,48 @@
+# Herdr configuration.
+# Only overrides live here; see `herdr --default-config` for everything else.
+# Reload with: herdr server reload-config
+
+onboarding = false
+
+# Agent state changes in background workspaces -> desktop notifications
+# (D-Bus, lands in swaync). Sounds stay at their defaults.
+[ui.toast]
+delivery = "system"
+
+# Repaint pane screen contents after a full server restart (tmux-resurrect
+# style). Note: persists recent pane output as plaintext under ~/.config/herdr.
+[experimental]
+pane_history = true
+
+# Back-and-forth to the last focused pane, across workspaces and tabs
+# (tmux switch-client -l style). Overrides the default cycle_pane_next
+# on the same key.
+[keys]
+last_pane = "prefix+tab"
+previous_agent = "ctrl+alt+p"
+next_agent = "ctrl+alt+n"
+previous_workspace = "ctrl+alt+comma"
+next_workspace = "ctrl+alt+period"
+
+# Sessionizer: fuzzy-jump to projects, workspaces, and agents;
+# clones from GitHub on ctrl-g. Same muscle memory as tmux prefix+f.
+[[keys.command]]
+key = "prefix+f"
+type = "popup"
+command = "~/.config/zsh/herdr-sessionizer.sh"
+description = "fuzzy jump: projects, workspaces, agents"
+width = "85%"
+height = "75%"
+
+[ui]
+agent_panel_sort = "priority"
+
+# File search: fuzzy-find files and folders across the home folder.
+# Enter edits files or opens folders; ctrl-y types the path into the pane.
+[[keys.command]]
+key = "prefix+shift+f"
+type = "popup"
+command = "~/.config/zsh/herdr-file-search.sh"
+description = "file search: home files, folders, and contents"
+width = "90%"
+height = "85%"

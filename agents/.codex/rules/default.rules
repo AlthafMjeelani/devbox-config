@@ -1,0 +1,71 @@
+prefix_rule(
+    pattern = ["git", "status"],
+    decision = "allow",
+    justification = "Read-only git status is safe to run without prompting",
+)
+
+prefix_rule(
+    pattern = ["git", "diff"],
+    decision = "allow",
+    justification = "Read-only git diff is safe to run without prompting",
+)
+
+prefix_rule(
+    pattern = ["git", "log"],
+    decision = "allow",
+    justification = "Read-only git log is safe to run without prompting",
+)
+
+prefix_rule(
+    pattern = ["npm", "test"],
+    decision = "allow",
+    justification = "Project test runners are allowed without prompting",
+)
+
+prefix_rule(
+    pattern = ["pnpm", "test"],
+    decision = "allow",
+    justification = "Project test runners are allowed without prompting",
+)
+
+prefix_rule(
+    pattern = ["yarn", "test"],
+    decision = "allow",
+    justification = "Project test runners are allowed without prompting",
+)
+
+prefix_rule(
+    pattern = ["go", "test"],
+    decision = "allow",
+    justification = "Project test runners are allowed without prompting",
+)
+
+prefix_rule(
+    pattern = ["php", "artisan", "test"],
+    decision = "allow",
+    justification = "Project test runners are allowed without prompting",
+)
+
+prefix_rule(
+    pattern = ["vendor/bin/phpunit"],
+    decision = "allow",
+    justification = "Project test runners are allowed without prompting",
+)
+
+prefix_rule(
+    pattern = ["pytest"],
+    decision = "allow",
+    justification = "Project test runners are allowed without prompting",
+)
+
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "forbidden",
+    justification = "Never push automatically; ask the user to push explicitly after review",
+)
+prefix_rule(pattern=["python3", "/private/tmp/vf-similar-mobile/final_test_fix.py"], decision="allow")
+prefix_rule(pattern=["fvm", "dart", "format"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "fvm flutter analyze --no-pub > /private/tmp/vf-similar-mobile/analyze-complete.log 2>&1"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "fvm flutter test --no-pub test/helpers/product_similarity_search_test.dart test/view/widgets/similar_product_search_groups_test.dart test/helpers/product_search_sql_test.dart test/helpers/product_table_row_resolver_test.dart > /private/tmp/vf-similar-mobile/tests-complete.log 2>&1"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "fvm flutter test --no-pub test/helpers/product_similarity_search_test.dart test/view/widgets/similar_product_search_groups_test.dart test/helpers/product_search_sql_test.dart test/helpers/product_table_row_resolver_test.dart > /private/tmp/vf-similar-mobile/tests-final.log 2>&1"], decision="allow")
+prefix_rule(pattern=["ps", "-axo", "pid,ppid,etime,pcpu,comm"], decision="allow")

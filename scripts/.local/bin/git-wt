@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+#
+# git-wt - sibling git worktree manager for parallel (AI-)agent workflows.
+#
+# Worktrees live in a sibling directory next to the MAIN repo:
+#
+#   /parent/<repo>/                 <- main worktree
+#   /parent/<repo>.worktrees/<name> <- linked worktrees
+#
+# This keeps every task/branch/agent in its own isolated checkout without
+# nesting worktrees inside the repo (so they never get committed or scanned).
+#
+# Usage:
+#   git wt new <branch> [<start-point>] [--no-setup]
+#                                         Create a worktree for <branch>
+#                                         (creates the branch if it's new)
+#   git wt list                           List worktrees for this repo
+#   git wt path <branch>                  Print the worktree path (for cd)
+#   git wt rm <branch> [-D] [--force]     Remove a worktree
+#                                           -D       also delete the branch
+#                                           --force  discard uncommitted work
+#   git wt prune                          Prune stale worktree metadata
+#   git wt help                           Show this help
+#
+# Post-create hook: if an executable `.worktrees-setup` exists at the MAIN repo
+# root, `new` runs it inside the freshly-created worktree (to copy .env, install
+# deps, etc.). It runs with CWD = the new worktree and receives the branch name as
+# $1 and the main repo root in $GIT_WT_MAIN. Skip it for one run with --no-setup.
+#
+# Invoke as `git wt <cmd>` (this file is on PATH as `git-wt`) or `git-wt <cmd>`.
+# For `cd` into a worktree, use the `wt` shell function (see .aliasrc).
+
+set -euo pipefail
+
+die() { printf 'git-wt: %s\n' "$*" >&2; exit 1; }
+
+# Resolve the MAIN worktree root, even when called from inside a linked worktree.
+# --git-common-dir points at the shared .git dir of the primary worktree.
+main_root() {
+	git rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+		|| die "not inside a git repository"
+	local common
+	common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+		|| die "could not resolve git common dir"
+	# common is <main>/.git (or a bare dir); its parent is the main worktree.
+	dirname "$common"
+}
+
+wt_base() {
+	local root name
+	root=$(main_root)
+	name=$(basename "$root")
+	printf '%s.worktrees' "$(dirname "$root")/$name"
+}
+
+# Sanitize a branch name into a safe directory leaf: feat/foo -> feat-foo.
+sanitize() { printf '%s' "$1" | tr '/' '-'; }
+
+wt_path_for() { printf '%s/%s' "$(wt_base)" "$(sanitize "$1")"; }
+
+branch_exists() { git show-ref --verify --quiet "refs/heads/$1"; }
+
+remote_branch_exists() { git show-ref --verify --quiet "refs/remotes/origin/$1"; }
+
+normalize_upstream() {
+	local branch="$1"
+	if remote_branch_exists "$branch"; then
+		git branch --set-upstream-to="origin/$branch" "$branch" >/dev/null 2>&1 || true
+	else
+		# Creating from origin/main can auto-track origin/main via branch.autoSetupMerge.
+		# Feature worktrees should not compare themselves to main after creation.
+		git branch --unset-upstream "$branch" >/dev/null 2>&1 || true
+	fi
+}
+
+default_start_point() {
+	# Prefer origin's default branch, else current HEAD.
+	local ref
+	if ref=$(git symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null); then
+		printf '%s' "${ref#refs/remotes/}"
+	else
+		printf 'HEAD'
+	fi
+}
+
+# Run the optional post-create hook (.worktrees-setup at the main repo root)
+# inside the new worktree. Silent when absent; warns if present but not executable.
+run_setup_hook() {
+	local path="$1" branch="$2" root hook
+	root=$(main_root)
+	hook="$root/.worktrees-setup"
+	[ -e "$hook" ] || return 0
+	if [ ! -x "$hook" ]; then
+		printf 'git-wt: %s exists but is not executable; skipping (chmod +x it to enable)\n' "$hook" >&2
+		return 0
+	fi
+	printf '\n→ running post-create hook: %s\n' "$hook"
+	( cd "$path" && GIT_WT_MAIN="$root" "$hook" "$branch" ) \
+		|| printf 'git-wt: post-create hook exited non-zero (worktree kept)\n' >&2
+}
+
+cmd_new() {
+	local branch="" start="" run_setup=1
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			--no-setup) run_setup=0 ;;
+			-*) die "unknown flag: $1" ;;
+			*) if [ -z "$branch" ]; then branch="$1"; else start="$1"; fi ;;
+		esac
+		shift
+	done
+	[ -n "$branch" ] || die "usage: git wt new <branch> [<start-point>] [--no-setup]"
+	local path; path=$(wt_path_for "$branch")
+
+	[ -e "$path" ] && die "worktree path already exists: $path"
+	mkdir -p "$(wt_base)"
+
+	if branch_exists "$branch"; then
+		# Attach an existing branch.
+		git worktree add "$path" "$branch"
+	else
+		# Create a new branch from start-point.
+		[ -n "$start" ] || start=$(default_start_point)
+		git worktree add -b "$branch" "$path" "$start"
+	fi
+	normalize_upstream "$branch"
+
+	[ "$run_setup" -eq 1 ] && run_setup_hook "$path" "$branch"
+
+	printf '\n✔ worktree ready: %s\n' "$path"
+	printf '  cd %s\n' "$path"
+	printf '  (or: wt %s)\n' "$branch"
+}
+
+cmd_list() {
+	git worktree list
+}
+
+cmd_path() {
+	[ $# -ge 1 ] || die "usage: git wt path <branch>"
+	local path; path=$(wt_path_for "$1")
+	[ -d "$path" ] || die "no worktree for '$1' at $path"
+	printf '%s\n' "$path"
+}
+
+cmd_rm() {
+	local branch="" del_branch=0 force=0
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			-D) del_branch=1 ;;
+			--force|-f) force=1 ;;
+			-*) die "unknown flag: $1" ;;
+			*) branch="$1" ;;
+		esac
+		shift
+	done
+	[ -n "$branch" ] || die "usage: git wt rm <branch> [-D] [--force]"
+	local path; path=$(wt_path_for "$branch")
+	[ -d "$path" ] || die "no worktree for '$branch' at $path"
+
+	if [ "$force" -eq 1 ]; then
+		git worktree remove --force "$path"
+	else
+		git worktree remove "$path"
+	fi
+	printf '✔ removed worktree: %s\n' "$path"
+
+	if [ "$del_branch" -eq 1 ]; then
+		if [ "$force" -eq 1 ]; then
+			git branch -D "$branch" && printf '✔ deleted branch: %s\n' "$branch"
+		else
+			git branch -d "$branch" && printf '✔ deleted branch: %s\n' "$branch"
+		fi
+	fi
+
+	# Tidy the base dir if now empty.
+	rmdir "$(wt_base)" 2>/dev/null || true
+}
+
+cmd_prune() {
+	git worktree prune -v
+	rmdir "$(wt_base)" 2>/dev/null || true
+}
+
+# Print the leading comment block (after the shebang), stripping the "# " prefix.
+cmd_help() { awk 'NR==1{next} /^#/{sub(/^#[ ]?/,""); print; next} {exit}' "$0"; }
+
+main() {
+	local sub="${1:-help}"; shift || true
+	case "$sub" in
+		new|add)   cmd_new "$@" ;;
+		list|ls)   cmd_list "$@" ;;
+		path)      cmd_path "$@" ;;
+		rm|remove) cmd_rm "$@" ;;
+		prune)     cmd_prune "$@" ;;
+		help|-h|--help) cmd_help ;;
+		*) die "unknown command: $sub (try: git wt help)" ;;
+	esac
+}
+
+main "$@"

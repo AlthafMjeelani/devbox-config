@@ -1,0 +1,9 @@
+{
+  "amp.gauge": "cost",
+  "amp.remoteThreadCreation.enabled": true,
+  "amp.permissions": [],
+  "amp.git.commit.coauthor.enabled": false,
+  "amp.git.commit.ampThread.enabled": true,
+  "amp.notifications.enabled": true,
+  "amp.thread.autoArchiveOnQuit": false
+}

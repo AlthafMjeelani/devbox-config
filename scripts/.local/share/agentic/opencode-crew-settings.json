@@ -1,0 +1,18 @@
+{
+  "permission": {
+    "bash": {
+      "*": "allow",
+      "git push*": "deny",
+      "git reset --hard*": "deny",
+      "git clean -f*": "deny",
+      "sudo*": "deny",
+      "rm -rf /*": "deny",
+      "rm -rf ~*": "deny",
+      "rm -rf $HOME*": "deny",
+      ":(){*": "deny"
+    },
+    "edit": "allow",
+    "external_directory": "allow",
+    "webfetch": "allow"
+  }
+}

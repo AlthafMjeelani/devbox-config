@@ -1,0 +1,105 @@
+---
+name: crew
+description: Use when orchestrating several agents in parallel - split a request into independent features, dispatch one crewmate per feature with the `crew` CLI, then stop and report status on request (not continuously) so ready branches can be reviewed and shipped.
+compatibility: Requires the local Crew, git-wt, Herdr or tmux, and agent CLI setup. In Amp orbs, use native Amp delegation or separate orb threads instead.
+---
+## What it is
+`crew` runs multiple agents in parallel, each in its own `git wt` worktree and detached tmux
+session or background herdr workspace (backend auto-detected; on herdr a task runs the engine's
+interactive TUI with live status, `--headless` for the bounded non-interactive run).
+You are the **captain**: you plan, dispatch, and monitor - you do not write code
+yourself. Each crewmate implements one feature and commits on its own branch. Crewmates never
+push; the user reviews and ships each ready branch.
+
+## When to use
+The user asks to build 2-3 (or more) independent features/fixes at once, or to fan a batch of
+similar changes across a codebase. If the work is a single change, do it directly instead - crew
+is overhead you only want for genuine parallelism.
+
+Before dispatching, verify that `crew`, `git-wt`, the selected agent CLI, and a supported Herdr or tmux backend are available.
+This is a local-runner workflow and must not be bootstrapped inside an Amp orb.
+In an orb, use the native delegation tools available to Amp for independent work, or create separate orb threads when each task needs its own checkout.
+
+## Native subagents versus crew
+Use native subagents, including Kimi Code's `AgentSwarm` and Amp's `Task` tool, for parallel
+read-only exploration, review, research, or tightly coordinated subtasks that contribute to one
+main-agent result.
+Use `crew` when each task should independently edit, test, and commit a shippable branch.
+Native subagents share the parent workspace and are not a substitute for crew's Git worktree
+isolation. Do not dispatch concurrent editing subagents that may touch the same files.
+
+## The protocol
+1. **Split** the request into independent features. Each must be shippable on its own and must
+   not fight another crewmate over the same files (crewmates do not coordinate shared edits).
+   If two "features" touch the same core file, merge them into one task or sequence them.
+2. **Name + brief** each feature: a short branch name (`feat-dark-mode`) and a crisp,
+   self-contained task string. The crewmate has no other context, so use the evidence contract
+   below. It does not need generic commit/push instructions - `crew` appends those.
+
+   ```markdown
+   ## Goal
+   ## Desired behavior
+   ## Acceptance criteria
+   ## Out of scope
+   ## Ownership boundary or likely touchpoints
+   ## Allowed authority
+   - May edit:
+   - May add dependencies:
+   - May commit: yes
+   - May push/publish/deploy: no
+   ## Verification
+   - Focused command:
+   - Broader command:
+   - Manual scenario, if unavoidable:
+   ## Relevant artifacts
+   - Plan/spec:
+   - Decisions/research/prototype verdict:
+   ## Blocked by
+   ```
+
+   Use exact commands when they are known from repository evidence.
+   If an authority boundary or prerequisite decision is unclear, resolve it before dispatch rather
+   than asking the crewmate to guess.
+3. **Dispatch** one crewmate per feature:
+   ```bash
+   crew new "<self-contained task>"
+   # Or force a branch name:
+   crew new -b <branch> "<self-contained task>"
+   ```
+   OpenCode is the default engine. Add `--claude`, `--codex`, `--kimi`, `--amp`, `--commandcode`, or
+   `--antigravity` to select another engine. Kimi tasks use regular K2.7 for `fast` and `standard`, K3 for `deep`, and run
+   headlessly because Kimi has no documented seeded-prompt interactive launch mode. Amp uses
+   `low` for `fast` and `medium` for both `standard` and `deep`; Crew never selects Amp's costly
+   `high` or `ultra` modes. CommandCode uses DeepSeek V4 Flash for `fast`, DeepSeek V4 Pro for
+   `standard`, and Qwen3.7-Max for `deep`; its headless (`-p`) mode cannot write without `--yolo`,
+   so tasked crewmates run `--yolo` bounded by the required `CREW_MANAGED`-gated guard hook
+   (`crew-guard.sh`), which denies push/sudo/hard-reset/clean/rm. Crew refuses to launch a
+   CommandCode crewmate if that hook is missing. Antigravity uses `gemini-3.6-flash-low` for `fast`,
+   `gemini-3.6-flash-high` for `standard`, and `gemini-3.1-pro-high` for `deep` under bounded
+   `--dangerously-skip-permissions`. Codex uses `gpt-5.6-luna` with reasoning effort `low` for
+   `fast`, `gpt-5.6-terra` for `standard`, and `gpt-5.6-sol` for `deep`; reasoning effort is a
+   separate Codex setting and must not be appended to the model slug.
+4. **Report and stop.** After dispatching, tell the user what you launched and how to check in
+   (`crew status`, `crew logs <branch>`, and `crew watch` in a separate pane for push alerts when a
+   crewmate is ready or blocked), then **end your turn and hand control back**. There is no live
+   watcher inside you: do not sit in a `crew status` loop narrating progress - that just spams the
+   user and burns tokens. Reporting is **on request**, not continuous.
+5. **Status on request.** When the user asks how it's going, run `crew status` once (and
+   `crew logs <branch>` if a line needs context), summarize, and stop:
+   ```bash
+   crew status            # branch | running/done(rc) | commits-ahead | last log line
+   crew logs <branch>     # full captured output (-f to follow)
+   ```
+   - **Blocked**: a crewmate that hits an ambiguous requirement prints `BLOCKED: <reason>` and
+     stops. Surface that reason and ask the user how to proceed; do not guess for them.
+   - **Ready**: a crewmate that shows `done` with commits-ahead > 0 is **ready for review**. List
+     the ready branches with a one-line summary each.
+
+## Rules
+- Never push or merge. Hand ready branches to the user to review (`/review-diff`) and ship
+  (`/ship-gate`). A crewmate `done:0` means it committed, not that the work is correct.
+- Choose independent features. If a plan needs shared-file coordination, say so and sequence it
+  rather than dispatching colliding crewmates.
+- One crewmate per branch. Re-running `crew new` on an existing branch reuses its session.
+- Tear down finished processes with `crew stop <branch>`.
+- Use `crew stop -D <branch>` only after verifying that the work is merged or disposable and obtaining approval to delete the worktree and branch.

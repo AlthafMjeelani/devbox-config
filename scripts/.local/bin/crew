@@ -1,0 +1,835 @@
+#!/usr/bin/env bash
+#
+# crew - lightweight tmux/herdr multi-agent orchestrator for parallel (AI-)agent work.
+#
+# Each crewmate is a branch in its own isolated worktree (via `git wt`) running an
+# agent in its own detached tmux session or background herdr workspace. No orchestration
+# daemon, no shared state - just spawn, monitor, and tear down. Our own take on the
+# firstmate idea.
+#
+# Usage:
+#   crew new <task...>            Create a worktree + session/workspace and launch an agent.
+#                                   The branch is AI-named from the task (printed as
+#                                   "-> branch: ..."); no need to invent a name.
+#                                   A task always runs headlessly, implements + commits,
+#                                   then exits on both Herdr and tmux.
+#                                   No task -> interactive agent TUI in the worktree.
+#                                 Flags: -b/--branch <name> (reuse/force a branch instead
+#                                        of AI-naming; no task -> interactive agent),
+#                                        --attach (jump to it), --claude, --codex, --kimi, --amp,
+#                                        --commandcode,
+#                                        --headless (accepted for compatibility; tasked runs
+#                                        are always bounded), --profile fast|standard|deep,
+#                                        --start <ref> (branch start-point).
+#   crew status [branch] [--all]  Report crewmates: engine, profile, model, running/done, commits, last log line.
+#   crew logs <branch> [-f]       Print (or follow with -f) a crewmate's captured output.
+#   crew watch [-n SECS] [-1] [--all]  Notify (notify-send + bell) when a crewmate finishes/blocks.
+#   crew ls [--all]               List active crew tmux sessions / herdr workspaces.
+#   crew attach <branch>          Attach/switch to a crewmate's session/workspace.
+#   crew stop <branch> [-D]       Kill the session/workspace (-D also removes worktree + branch).
+#   crew help                     Show this help.
+#
+# crew is scoped per repository: sessions and state are namespaced by a repo key (stable
+# across the repo's worktrees), so ls/status/watch show only the current repo's crewmates.
+# Pass --all to span every repo. Headless crewmates commit on their own branch; they never
+# push. Review each ready branch (/review-diff) and ship it (/ship-gate).
+# Backend: auto-detected per crewmate at spawn - herdr inside herdr (HERDR_ENV), tmux inside
+# tmux, else tmux if installed; CREW_BACKEND=tmux|herdr forces one. Requires: tmux, or
+# herdr + jq. Also: git-wt + ai-branch-name (PATH), opencode/claude/codex/kimi/amp/commandcode. Run from inside
+# the target git repo.
+
+set -euo pipefail
+
+die() { printf 'crew: %s\n' "$*" >&2; exit 1; }
+
+# Backend selection for NEW crewmates: CREW_BACKEND override > inside herdr > inside tmux
+# > tmux if installed (backward compat: every environment that worked before keeps working
+# unchanged) > herdr if its server is reachable.
+detect_backend() {
+	case "${CREW_BACKEND:-}" in
+		tmux|herdr) printf '%s' "$CREW_BACKEND"; return ;;
+		"") ;;
+		*) die "invalid CREW_BACKEND '${CREW_BACKEND}' (use tmux or herdr)" ;;
+	esac
+	if [ -n "${HERDR_ENV:-}" ]; then printf 'herdr'
+	elif [ -n "${TMUX:-}" ]; then printf 'tmux'
+	elif command -v tmux >/dev/null 2>&1; then printf 'tmux'
+	elif command -v herdr >/dev/null 2>&1 && herdr workspace list >/dev/null 2>&1; then printf 'herdr'
+	else die "no backend available (need tmux, or a running herdr server)"
+	fi
+}
+
+require_backend_tools() {
+	case "$1" in
+		tmux)
+			command -v tmux >/dev/null 2>&1 || die "tmux is not installed" ;;
+		herdr)
+			command -v herdr >/dev/null 2>&1 || die "herdr not on PATH"
+			command -v jq >/dev/null 2>&1 || die "jq is required for the herdr backend"
+			herdr workspace list >/dev/null 2>&1 || die "herdr server not reachable (start herdr first)" ;;
+	esac
+}
+
+# Backend a crewmate was CREATED with; state from older crew versions has no backend file
+# and is always tmux. Recorded at spawn so status/attach/stop/watch operate on the right
+# backend regardless of where the caller now sits.
+backend_for() { cat "$1/backend" 2>/dev/null || printf 'tmux'; }
+
+# Is the crewmate's session/workspace still alive?
+crewmate_alive() {
+	local sdir="$1" ws name
+	if [ "$(backend_for "$sdir")" = herdr ]; then
+		ws=$(cat "$sdir/workspace_id" 2>/dev/null) || return 1
+		herdr workspace get "$ws" >/dev/null 2>&1
+	else
+		name=$(cat "$sdir/session" 2>/dev/null) || return 1
+		tmux has-session -t "$name" 2>/dev/null
+	fi
+}
+
+PREFIX="crew_"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/crew"
+TASK_SUFFIX="When done, commit your work on this branch with a Conventional-commit message. Do not push. If blocked, print BLOCKED: <reason> and stop."
+KIMI_TASK_SUFFIX="Do not use sudo, rewrite Git history, delete the worktree, or perform any other destructive or outward-facing action."
+AMP_TASK_SUFFIX="$KIMI_TASK_SUFFIX"
+COMMANDCODE_TASK_SUFFIX="$KIMI_TASK_SUFFIX"
+ANTIGRAVITY_TASK_SUFFIX="$KIMI_TASK_SUFFIX"
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+AMP_CREW_SETTINGS="${CREW_AMP_SETTINGS:-$SCRIPT_DIR/../share/agentic/amp-settings.json}"
+OPENCODE_CREW_SETTINGS="${CREW_OPENCODE_SETTINGS:-$SCRIPT_DIR/../share/agentic/opencode-crew-settings.json}"
+AMP_GUARD_PLUGIN="$HOME/.config/amp/plugins/workflow-guardrails.ts"
+COMMANDCODE_GUARD_HOOK="$HOME/.commandcode/hooks/crew-guard.sh"
+# agy's -p mode gives up after --print-timeout, which defaults to 5m. A crew task routinely
+# runs longer than that and dies with "Error: timeout waiting for response" having committed
+# nothing, so raise it well past any realistic task.
+ANTIGRAVITY_PRINT_TIMEOUT="${CREW_AGY_PRINT_TIMEOUT:-4h}"
+
+# Per-engine bounded-autonomy flags so a headless crewmate can edit + run tests + commit
+# but never push - auto-approve everything EXCEPT an explicit deny-list, not a full yolo mode.
+#   opencode: --agent build --auto plus a global Crew-only policy inherited by delegated
+#             subagents; both retain explicit denies for push / sudo / destructive commands.
+#   claude  : auto-accept edits, allow Bash, deny push / sudo / hard-reset.
+#   codex   : workspace-write sandbox plus --add-dir on the repo's common git dir, so a
+#             crewmate in a linked worktree can commit (network off, so push is blocked).
+#   kimi    : print mode's bounded auto permission policy plus explicit task guardrails.
+#   amp     : execute mode loads minimal commit settings; the required workflow-guardrails
+#             plugin rejects push / sudo / hard-reset / git clean / dangerous rm commands.
+#   commandcode : -p headless mode is read-only unless --yolo, so a tasked crewmate runs
+#             --yolo bounded by the required CREW_MANAGED-gated PreToolUse guard hook
+#             (crew-guard.sh), which denies push / sudo / hard-reset / git clean / dangerous
+#             rm. The hook is a no-op outside CREW_MANAGED, so interactive use is unaffected.
+OPENCODE_CREW_FLAGS="--agent build --auto"
+CLAUDE_CREW_FLAGS="--permission-mode acceptEdits --allowedTools Bash Edit Write --disallowedTools 'Bash(git push:*)' 'Bash(sudo:*)' 'Bash(git reset --hard origin:*)'"
+# network_access lets tests bind loopback listeners (Go httptest, dev servers).
+# Without it a crewmate cannot run most integration suites and will report them skipped.
+CODEX_CREW_FLAGS="${CREW_CODEX_FLAGS:---sandbox workspace-write -c sandbox_workspace_write.network_access=true}"
+
+# A linked worktree keeps its git metadata in the MAIN repo at .git/worktrees/<name>,
+# which lies OUTSIDE the codex workspace-write sandbox. Without this, every codex
+# crewmate fails to commit with an index.lock permission error while looking like a
+# filesystem permissions problem. Resolved at run time, inside the worktree.
+CODEX_GIT_ADD_DIR='--add-dir "$(git rev-parse --git-common-dir 2>/dev/null || echo .git)"'
+
+# Toolchain caches live in $HOME, outside the workspace sandbox. Without write access a
+# crewmate cannot compile or resolve dependencies at all, and reports it as a permissions
+# error rather than a missing flag. Each entry is emitted only if the directory exists, so
+# this stays a no-op for languages the repo does not use.
+CODEX_CACHE_ADD_DIRS='$(for d in "$(go env GOCACHE 2>/dev/null)" "$(go env GOMODCACHE 2>/dev/null)" "$HOME/.cache/go-build" "$HOME/.npm" "$HOME/.cargo" "$HOME/.cache/uv"; do [ -n "$d" ] && [ -d "$d" ] && printf -- "--add-dir %s " "$d"; done)'
+
+codex_reasoning_flag() {
+	[ "$1" = fast ] || return 0
+	printf '%s' '-c model_reasoning_effort=low'
+}
+
+codex_headless_command() {
+	local model="$1" profile="$2" task="$3" reasoning
+	reasoning=$(codex_reasoning_flag "$profile")
+	printf 'codex exec --model %q %s %s %s %s %q' "$model" "$reasoning" "$CODEX_CREW_FLAGS" "$CODEX_GIT_ADD_DIR" "$CODEX_CACHE_ADD_DIRS" "$task"
+}
+
+codex_interactive_command() {
+	local model="$1" profile="$2" reasoning
+	reasoning=$(codex_reasoning_flag "$profile")
+	printf 'codex --model %q %s %s %s' "$model" "$reasoning" "$CODEX_GIT_ADD_DIR" "$CODEX_CACHE_ADD_DIRS"
+}
+
+opencode_headless_command() {
+	local settings
+	settings=$(cat "$OPENCODE_CREW_SETTINGS") || die "could not read OpenCode Crew settings: $OPENCODE_CREW_SETTINGS"
+	printf 'CREW_MANAGED=1 OPENCODE_CONFIG_CONTENT=%q opencode run --model %q %q %s' \
+		"$settings" "$1" "$2" "$OPENCODE_CREW_FLAGS"
+}
+
+# Claude's default print format emits nothing until the whole run finishes. Consume its
+# realtime event stream and retain only concise, human-readable activity: short agent
+# updates, tool names/targets, and completion. Thinking and potentially large tool results
+# are deliberately omitted.
+CLAUDE_STREAM_FILTER='
+def clean:
+  tostring
+  | gsub("[\\r\\n]+"; " ")
+  | gsub("[[:space:]]+"; " ")
+  | .[0:240];
+if .type == "system" and .subtype == "init" then
+  "[started] Claude session"
+elif .type == "assistant" then
+  .message.content[]?
+  | if .type == "text" then
+      if (.text | contains("BLOCKED:")) then .text
+      else "[agent] " + (.text | clean)
+      end
+    elif .type == "tool_use" then
+      "[" + (.name // "tool") + "] "
+      + ((.input.description // .input.file_path // .input.path // .input.command // .input.pattern // "working") | clean)
+    else empty
+    end
+elif .type == "result" then
+  if (.is_error // false) then
+    "[error] " + ((.result // .error // "Claude failed") | clean)
+  else
+    "[done] Claude finished"
+  end
+else empty
+end'
+
+claude_stream_filter() {
+	jq --unbuffered -r "$CLAUDE_STREAM_FILTER"
+}
+
+claude_headless_command() {
+	printf 'set -o pipefail; claude -p --model %q --output-format stream-json --verbose %q %s | jq --unbuffered -r %q' \
+		"$1" "$2" "$CLAUDE_CREW_FLAGS" "$CLAUDE_STREAM_FILTER"
+}
+
+task_with_guardrails() {
+	local engine="$1" task="$2" full="$task. $TASK_SUFFIX"
+	case "$engine" in
+		kimi) full="$full $KIMI_TASK_SUFFIX" ;;
+		amp)  full="$full $AMP_TASK_SUFFIX" ;;
+		commandcode) full="$full $COMMANDCODE_TASK_SUFFIX" ;;
+		antigravity|agy) full="$full $ANTIGRAVITY_TASK_SUFFIX" ;;
+	esac
+	printf '%s' "$full"
+}
+
+amp_headless_command() {
+	printf 'CREW_MANAGED=1 amp --settings-file %q --no-notifications -m %q --plugin-ready-timeout 10 -x %q' \
+		"$AMP_CREW_SETTINGS" "$1" "$2"
+}
+
+amp_interactive_command() {
+	local mode="$1" prompt="${2:-}"
+	if [ -n "$prompt" ]; then
+		printf 'printf %%s\\n %q | amp -m %q' "$prompt" "$mode"
+	else
+		printf 'amp -m %q' "$mode"
+	fi
+}
+
+# CommandCode: -p headless writes require --yolo, so bound the run with CREW_MANAGED (the
+# guard hook denies push/sudo/hard-reset/clean/rm). Output is plain text - tee it as-is,
+# no stream filter needed. $1=model, $2=task.
+commandcode_headless_command() {
+	printf 'CREW_MANAGED=1 commandcode -p %q --model %q --yolo --skip-onboarding -t' "$2" "$1"
+}
+
+commandcode_interactive_command() {
+	printf 'commandcode --model %q' "$1"
+}
+
+antigravity_headless_command() {
+	local bin="agy"
+	command -v agy >/dev/null 2>&1 || bin="antigravity"
+	printf 'CREW_MANAGED=1 %s -p %q --model %q --print-timeout %q --dangerously-skip-permissions' \
+		"$bin" "$2" "$1" "$ANTIGRAVITY_PRINT_TIMEOUT"
+}
+
+antigravity_interactive_command() {
+	local bin="agy"
+	command -v agy >/dev/null 2>&1 || bin="antigravity"
+	printf '%s --model %q' "$bin" "$1"
+}
+
+should_run_headless() {
+	local task="$1"
+	[ -n "$task" ]
+}
+
+require_engine_command() {
+	local engine="$1"
+	case "$engine" in
+		antigravity|agy)
+			command -v agy >/dev/null 2>&1 \
+				|| command -v antigravity >/dev/null 2>&1 \
+				|| die "agy or antigravity not on PATH"
+			;;
+		*) command -v "$engine" >/dev/null 2>&1 || die "$engine not on PATH" ;;
+	esac
+}
+
+require_amp_guard() {
+	[ -r "$AMP_GUARD_PLUGIN" ] \
+		|| die "Amp workflow guard plugin not found: $AMP_GUARD_PLUGIN (run: make restow-amp)"
+}
+
+# CommandCode crewmates run --yolo, so the deny-list guard hook is load-bearing: refuse
+# to launch without it rather than run unbounded.
+require_commandcode_guard() {
+	[ -x "$COMMANDCODE_GUARD_HOOK" ] \
+		|| die "CommandCode crew guard hook not found: $COMMANDCODE_GUARD_HOOK (run: make restow-commandcode)"
+}
+
+# Profiles make autonomous work predictable across engines instead of inheriting each CLI's
+# machine-local default. Standard is deliberately the default for implementation work.
+resolve_profile() {
+	local profile="$1" engine="$2"
+	case "$profile:$engine" in
+		fast:opencode)   printf '%s' 'openai/gpt-5.6-luna-low' ;;
+		standard:opencode) printf '%s' 'openai/gpt-5.6-terra' ;;
+		deep:opencode)   printf '%s' 'openai/gpt-5.6-sol' ;;
+		fast:claude)     printf '%s' 'haiku' ;;
+		standard:claude) printf '%s' 'sonnet' ;;
+		deep:claude)     printf '%s' 'opus' ;;
+		fast:codex)      printf '%s' 'gpt-5.6-luna' ;;
+		standard:codex)  printf '%s' 'gpt-5.6-terra' ;;
+		deep:codex)      printf '%s' 'gpt-5.6-sol' ;;
+		fast:kimi)       printf '%s' 'kimi-code/kimi-for-coding' ;;
+		standard:kimi)   printf '%s' 'kimi-code/kimi-for-coding' ;;
+		deep:kimi)       printf '%s' 'kimi-code/k3' ;;
+		fast:amp)         printf '%s' 'low' ;;
+		standard:amp)     printf '%s' 'medium' ;;
+		deep:amp)         printf '%s' 'high' ;;
+		fast:commandcode)     printf '%s' 'deepseek/deepseek-v4-flash' ;;
+		standard:commandcode) printf '%s' 'deepseek/deepseek-v4-pro' ;;
+		deep:commandcode)     printf '%s' 'Qwen/Qwen3.7-Max' ;;
+		fast:antigravity|fast:agy)         printf '%s' 'gemini-3.6-flash-low' ;;
+		standard:antigravity|standard:agy) printf '%s' 'gemini-3.6-flash-high' ;;
+		deep:antigravity|deep:agy)         printf '%s' 'gemini-3.1-pro-high' ;;
+		*) die "unknown crew profile '$profile' (use fast, standard, or deep)" ;;
+	esac
+}
+
+# Sanitize a name for use in tmux targets / paths: /, ., : -> _
+sanitize() { local s="$1"; s="${s//\//_}"; s="${s//./_}"; s="${s//:/_}"; printf '%s' "$s"; }
+
+# Per-repo key so crew is segregated by repository: sessions and state are namespaced by it,
+# and `ls`/`status`/`watch` scope to the current repo. Derived from `--git-common-dir`, which
+# is shared across a repo's worktrees, so the key is identical from the main repo or any
+# worktree of it. A short path hash disambiguates repos that share a basename.
+REPO_KEY=""
+compute_repo_key() {
+	local common root
+	common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+		|| common=$(git rev-parse --git-common-dir 2>/dev/null) || return 1
+	case "$common" in /*) : ;; *) common="$PWD/$common" ;; esac
+	root=$(cd "$(dirname "$common")" 2>/dev/null && pwd -P) || return 1
+	local hash; hash=$(printf '%s' "$root" | cksum | cut -d' ' -f1)
+	printf '%s-%s' "$(sanitize "$(basename "$root")")" "${hash: -6}"
+}
+require_repo() {
+	[ -n "$REPO_KEY" ] && return 0
+	REPO_KEY=$(compute_repo_key) || die "not inside a git repository"
+}
+
+repo_state_dir() { require_repo; printf '%s/%s' "$STATE_DIR" "$REPO_KEY"; }
+state_dir_for()  { printf '%s/%s' "$(repo_state_dir)" "$(sanitize "$1")"; }
+session_name()   { require_repo; printf '%s%s_%s' "$PREFIX" "$REPO_KEY" "$(sanitize "$1")"; }
+
+# Echo each crewmate state dir, one per line. Arg "all" spans every repo; otherwise the
+# current repo only.
+iter_state_dirs() {
+	local d r
+	if [ "${1:-}" = "all" ]; then
+		[ -d "$STATE_DIR" ] || return 0
+		for r in "$STATE_DIR"/*/; do
+			[ -d "$r" ] || continue
+			for d in "$r"*/; do [ -d "$d" ] && printf '%s\n' "${d%/}"; done
+		done
+	else
+		local rsd; rsd=$(repo_state_dir)
+		[ -d "$rsd" ] || return 0
+		for d in "$rsd"/*/; do [ -d "$d" ] && printf '%s\n' "${d%/}"; done
+	fi
+}
+
+# Attach if outside tmux, switch-client if inside.
+enter_session() {
+	local name="$1"
+	if [ -z "${TMUX:-}" ]; then
+		exec tmux attach-session -t "$name"
+	else
+		tmux switch-client -t "$name"
+	fi
+}
+
+# Backend-aware jump to a crewmate: $1 = state dir, $2 = tmux session name (legacy state).
+enter_crewmate() {
+	local sdir="$1" name="$2" ws
+	if [ "$(backend_for "$sdir")" = herdr ]; then
+		ws=$(cat "$sdir/workspace_id" 2>/dev/null) || die "no workspace recorded for this crewmate"
+		herdr workspace focus "$ws" >/dev/null || die "could not focus workspace $ws"
+		# Outside herdr, focusing alone isn't visible - attach the client too.
+		[ -n "${HERDR_ENV:-}" ] || exec herdr
+	else
+		enter_session "$name"
+	fi
+}
+
+# Spawn a crewmate as a background Herdr workspace. Expects cmd_new locals in scope:
+# name path sdir engine model task. A task always launches the bounded non-interactive
+# command, wrapped to tee a log, record its exit code, and report agent state to Herdr.
+# A branch-only launch without a task remains interactive.
+herdr_spawn() {
+	local out wsid pane
+	out=$(herdr workspace create --cwd "$path" --label "$name" --no-focus) \
+		|| die "herdr workspace create failed"
+	wsid=$(printf '%s' "$out" | jq -re '.result.workspace.workspace_id') \
+		|| die "could not parse workspace_id from herdr"
+	pane=$(printf '%s' "$out" | jq -re '.result.root_pane.pane_id') \
+		|| die "could not parse pane_id from herdr"
+	printf '%s\n' "$wsid" > "$sdir/workspace_id"
+	printf '%s\n' "$pane" > "$sdir/pane_id"
+
+	local launch full
+	if should_run_headless "$task"; then
+		full=$(task_with_guardrails "$engine" "$task")
+		case "$engine" in
+			claude)   launch=$(claude_headless_command "$model" "$full") ;;
+			codex)    launch=$(codex_headless_command "$model" "$profile" "$full") ;;
+			opencode) launch=$(opencode_headless_command "$model" "$full") ;;
+			kimi)     launch=$(printf 'kimi --model %q -p %q' "$model" "$full") ;;
+			amp)      launch=$(amp_headless_command "$model" "$full") ;;
+			commandcode) launch=$(commandcode_headless_command "$model" "$full") ;;
+			antigravity|agy) launch=$(antigravity_headless_command "$model" "$full") ;;
+			*) die "unknown engine: $engine" ;;
+		esac
+		printf 'running\n' > "$sdir/status"
+		local report="herdr pane report-agent $pane --source crew --agent $engine"
+		local wrapped launcher
+		wrapped="$report --state working >/dev/null 2>&1 || true; ( $launch ; rc=\$?; echo done:\$rc > \"$sdir/status\"; state=idle; [ \$rc -eq 0 ] || state=blocked; $report --state \$state --message done:\$rc >/dev/null 2>&1 || true ) 2>&1 | tee \"$sdir/log\""
+		# Herdr injects `pane run` commands through the terminal. Long escaped prompts can
+		# exceed that input path's size limit and leave the shell waiting at `subsh>` before
+		# the lifecycle reporter runs. Keep terminal input bounded and execute the full
+		# command from Crew's state directory instead.
+		launcher="$sdir/run.sh"
+		printf '#!/usr/bin/env bash\n%s\n' "$wrapped" > "$launcher"
+		herdr pane run "$pane" "$(printf 'bash %q' "$launcher")" >/dev/null
+	else
+		printf 'interactive\n' > "$sdir/status"
+		case "$engine" in
+			kimi) herdr pane run "$pane" "$(printf 'kimi --model %q' "$model")" >/dev/null ;;
+			amp)  herdr pane run "$pane" "$(amp_interactive_command "$model")" >/dev/null ;;
+			commandcode) herdr pane run "$pane" "$(commandcode_interactive_command "$model")" >/dev/null ;;
+			antigravity|agy) herdr pane run "$pane" "$(antigravity_interactive_command "$model")" >/dev/null ;;
+			codex) herdr pane run "$pane" "$(codex_interactive_command "$model" "$profile")" >/dev/null ;;
+			*)    herdr pane run "$pane" "$engine" >/dev/null ;;
+		esac
+	fi
+}
+
+cmd_new() {
+	local branch="" start="" task="" attach=0 engine="opencode" profile="standard"
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			-b|--branch) shift; branch="${1:-}" ;;
+			--attach) attach=1 ;;
+			--claude) engine="claude" ;;
+			--codex) engine="codex" ;;
+			--kimi) engine="kimi" ;;
+			--amp) engine="amp" ;;
+			--commandcode) engine="commandcode" ;;
+			--antigravity|--agy) engine="antigravity" ;;
+			--headless) : ;;
+			--profile) shift; profile="${1:-}" ;;
+			--start) shift; start="${1:-}" ;;
+			--) shift; break ;;
+			-*) die "unknown flag: $1" ;;
+			*) task+="${task:+ }$1" ;;
+		esac
+		shift
+	done
+	# Any remaining args after `--` are part of the task.
+	while [ $# -gt 0 ]; do task+="${task:+ }$1"; shift; done
+
+	git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not inside a git repository"
+	require_engine_command "$engine"
+	[ "$engine" != claude ] || command -v jq >/dev/null 2>&1 || die "jq is required for Claude activity logs"
+	local model; model=$(resolve_profile "$profile" "$engine")
+	[ "$engine" != amp ] || [ -r "$AMP_CREW_SETTINGS" ] \
+		|| die "Amp safety settings not found: $AMP_CREW_SETTINGS"
+	[ "$engine" != amp ] || require_amp_guard
+	[ "$engine" != commandcode ] || require_commandcode_guard
+
+	# Resolve the branch: explicit -b wins; otherwise AI-name it from the task.
+	if [ -z "$branch" ]; then
+		[ -n "$task" ] || die "usage: crew new [-b <branch>] <task...>"
+		branch=$(ai-branch-name --engine "$engine" "$task") || die "could not resolve a branch name"
+		printf '→ branch: %s\n' "$branch"
+	fi
+
+	# Create/attach the worktree via git-wt, then resolve its path. New worktrees start
+	# from the caller's current commit unless --start was supplied. Record that commit so
+	# status reports work produced by this crewmate, not unrelated divergence from main.
+	local path base
+	if path=$(git wt path "$branch" 2>/dev/null); then
+		printf 'crew: reusing existing worktree %s\n' "$path"
+		base=$(git -C "$path" rev-parse HEAD) || die "could not resolve HEAD for $path"
+	else
+		base=$(git rev-parse "${start:-HEAD}^{commit}") \
+			|| die "could not resolve start point '${start:-HEAD}'"
+		git wt new "$branch" "$base" >/dev/null
+		path=$(git wt path "$branch")
+	fi
+
+	local name; name=$(session_name "$branch")
+	local sdir; sdir=$(state_dir_for "$branch")
+	local backend; backend=$(detect_backend)
+	require_backend_tools "$backend"
+
+	local exists=0
+	if [ "$backend" = herdr ]; then
+		[ -f "$sdir/workspace_id" ] && crewmate_alive "$sdir" && exists=1
+	else
+		tmux has-session -t "$name" 2>/dev/null && exists=1
+	fi
+
+	if [ "$exists" = 1 ]; then
+		printf 'crew: session %s already exists\n' "$name"
+	else
+		# Record crewmate metadata for `crew status` / `crew logs`.
+		mkdir -p "$sdir"
+		printf '%s\n' "$branch" > "$sdir/branch"
+		printf '%s\n' "$path"   > "$sdir/worktree"
+		printf '%s\n' "$name"   > "$sdir/session"
+		printf '%s\n' "${task:-<interactive>}" > "$sdir/task"
+		printf '%s\n' "$engine" > "$sdir/engine"
+		printf '%s\n' "$profile" > "$sdir/profile"
+		printf '%s\n' "$model" > "$sdir/model"
+		printf '%s\n' "$base" > "$sdir/base"
+		printf '%s\n' "$backend" > "$sdir/backend"
+
+		if [ "$backend" = herdr ]; then
+			herdr_spawn
+		else
+			tmux new-session -ds "$name" -c "$path"
+
+			local launch
+			if [ -n "$task" ]; then
+				local full; full=$(task_with_guardrails "$engine" "$task")
+				case "$engine" in
+					claude)   launch=$(claude_headless_command "$model" "$full") ;;
+					codex)    launch=$(codex_headless_command "$model" "$profile" "$full") ;;
+					opencode) launch=$(opencode_headless_command "$model" "$full") ;;
+					kimi)     launch=$(printf 'kimi --model %q -p %q' "$model" "$full") ;;
+					amp)      launch=$(amp_headless_command "$model" "$full") ;;
+					commandcode) launch=$(commandcode_headless_command "$model" "$full") ;;
+					antigravity|agy) launch=$(antigravity_headless_command "$model" "$full") ;;
+					*) die "unknown engine: $engine" ;;
+				esac
+				# Wrap so we capture output to the log and record the real exit code on finish.
+				printf 'running\n' > "$sdir/status"
+				local wrapped
+				wrapped="( $launch ; echo done:\$? > \"$sdir/status\" ) 2>&1 | tee \"$sdir/log\""
+				tmux send-keys -t "$name" "$wrapped" C-m
+			else
+				printf 'interactive\n' > "$sdir/status"
+				case "$engine" in
+					kimi) tmux send-keys -t "$name" "$(printf 'kimi --model %q' "$model")" C-m ;;
+					amp)  tmux send-keys -t "$name" "$(amp_interactive_command "$model")" C-m ;;
+					commandcode) tmux send-keys -t "$name" "$(commandcode_interactive_command "$model")" C-m ;;
+					antigravity|agy) tmux send-keys -t "$name" "$(antigravity_interactive_command "$model")" C-m ;;
+					codex) tmux send-keys -t "$name" "$(codex_interactive_command "$model" "$profile")" C-m ;;
+					*)    tmux send-keys -t "$name" "$engine" C-m ;;
+				esac
+			fi
+		fi
+		printf 'crew %s ready in %s (%s, %s)\n' "$name" "$path" "$profile" "$model"
+		printf '  monitor: crew status %s   attach: crew attach %s\n' "$branch" "$branch"
+	fi
+
+	[ "$attach" -eq 0 ] || enter_crewmate "$sdir" "$name"
+}
+
+# Commits produced since this crewmate's recorded starting point. State created by older
+# crew versions has no base file, so retain the old remote-default comparison as a fallback.
+commits_ahead() {
+	local wt="$1" sdir="${2:-}" base=""
+	[ -n "$sdir" ] && base=$(cat "$sdir/base" 2>/dev/null || true)
+	[ -n "$base" ] || base=$(git -C "$wt" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+	[ -n "$base" ] || { printf '?'; return; }
+	git -C "$wt" rev-list --count "$base..HEAD" 2>/dev/null || printf '?'
+}
+
+report_one() {
+	local sdir="$1" label="${2:-}"
+	[ -d "$sdir" ] || return 0
+	local branch wt status name engine profile model last ahead
+	branch=$(cat "$sdir/branch" 2>/dev/null || basename "$sdir")
+	wt=$(cat "$sdir/worktree" 2>/dev/null || echo '?')
+	status=$(cat "$sdir/status" 2>/dev/null || echo '?')
+	name=$(cat "$sdir/session" 2>/dev/null || true)
+	engine=$(cat "$sdir/engine" 2>/dev/null || printf '?')
+	profile=$(cat "$sdir/profile" 2>/dev/null || printf '?')
+	model=$(cat "$sdir/model" 2>/dev/null || printf '?')
+	# A 'running' crewmate whose session is gone actually exited (crashed or killed).
+	# On herdr, enrich a live crewmate's status with herdr's agent detection
+	# (interactive/working, interactive/blocked, interactive/idle, ...).
+	if [ "$(backend_for "$sdir")" = herdr ]; then
+		local ws hout astat
+		ws=$(cat "$sdir/workspace_id" 2>/dev/null || true)
+		if [ -n "$ws" ] && hout=$(herdr workspace get "$ws" 2>/dev/null); then
+			astat=$(printf '%s' "$hout" | jq -r '.result.workspace.agent_status // empty')
+			[ -n "$astat" ] && [ "$astat" != "unknown" ] && status="$status/$astat"
+		else
+			case "$status" in running|interactive) status="exited?" ;; esac
+		fi
+	elif [ -n "$name" ] && [ "$status" = "running" ] && ! tmux has-session -t "$name" 2>/dev/null; then
+		status="exited?"
+	fi
+	ahead=$([ -d "$wt" ] && commits_ahead "$wt" "$sdir" || printf '?')
+	# No log file (interactive crewmate) must not kill the report under pipefail.
+	last=$(tail -n1 "$sdir/log" 2>/dev/null | tr -d '\r' | cut -c1-60 || true)
+	if [ -n "$label" ]; then
+		printf '%-20s %-22s %-10s %-10s %-20s %-10s %3s  %s\n' "$label" "$branch" "$engine" "$profile" "$model" "$status" "$ahead" "$last"
+	else
+		printf '%-24s %-10s %-10s %-20s %-10s %3s commit(s)  %s\n' "$branch" "$engine" "$profile" "$model" "$status" "$ahead" "$last"
+	fi
+}
+
+cmd_status() {
+	local all=0 branch=""
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			--all) all=1 ;;
+			-*) die "unknown flag: $1" ;;
+			*) branch="$1" ;;
+		esac
+		shift
+	done
+	[ "$all" = 1 ] || require_repo
+
+	if [ -n "$branch" ]; then
+		printf '%-24s %-10s %-10s %-20s %-10s %-12s %s\n' 'BRANCH' 'ENGINE' 'PROFILE' 'MODEL' 'STATUS' 'AHEAD' 'LAST OUTPUT'
+		report_one "$(state_dir_for "$branch")"
+		return
+	fi
+
+	local any=0 d
+	if [ "$all" = 1 ]; then
+		printf '%-20s %-22s %-10s %-10s %-20s %-10s %-4s %s\n' 'REPO' 'BRANCH' 'ENGINE' 'PROFILE' 'MODEL' 'STATUS' 'AHD' 'LAST OUTPUT'
+		while IFS= read -r d; do
+			[ -n "$d" ] || continue
+			any=1; report_one "$d" "$(basename "$(dirname "$d")")"
+		done < <(iter_state_dirs all)
+	else
+		printf '%-24s %-10s %-10s %-20s %-10s %-12s %s\n' 'BRANCH' 'ENGINE' 'PROFILE' 'MODEL' 'STATUS' 'AHEAD' 'LAST OUTPUT'
+		while IFS= read -r d; do
+			[ -n "$d" ] || continue
+			any=1; report_one "$d"
+		done < <(iter_state_dirs)
+	fi
+	[ "$any" = 1 ] || printf '(no crewmates)\n'
+}
+
+cmd_logs() {
+	local follow=0 branch=""
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			-f|--follow) follow=1 ;;
+			*) branch="$1" ;;
+		esac
+		shift
+	done
+	[ -n "$branch" ] || die "usage: crew logs <branch> [-f]"
+	local sdir; sdir=$(state_dir_for "$branch")
+	local log="$sdir/log"
+	if [ ! -f "$log" ] && [ "$(backend_for "$sdir")" = herdr ] && [ -f "$sdir/pane_id" ]; then
+		# Interactive herdr crewmates have no captured log; read the pane scrollback
+		# instead (pane read emits plain text, unlike the JSON list/get commands).
+		[ "$follow" = 1 ] && die "no log file for '$branch' (interactive); -f needs a headless crewmate"
+		herdr pane read "$(cat "$sdir/pane_id")" --source recent --lines 200
+		return
+	fi
+	[ -f "$log" ] || die "no log for '$branch' (interactive or not started?)"
+	if [ "$follow" = 1 ]; then tail -f "$log"; else cat "$log"; fi
+}
+
+# Best-effort notification: terminal bell + line, plus a desktop toast if available.
+# Never fails the watch loop.
+notify() {
+	local title="$1" body="$2"
+	printf '\a[%s] %s - %s\n' "$(date +%H:%M:%S)" "$title" "$body"
+	command -v notify-send >/dev/null 2>&1 && notify-send "$title" "$body" 2>/dev/null || true
+	[ -n "${HERDR_ENV:-}" ] && command -v herdr >/dev/null 2>&1 \
+		&& herdr notification show "$title" --body "$body" >/dev/null 2>&1 || true
+}
+
+# Watch the state dir and alert when a crewmate reaches an actionable state (done, blocked,
+# or crashed). This is the event-driven layer an in-chat captain cannot provide on its own:
+# it runs in its own pane, costs zero tokens, and only speaks up on a state transition.
+cmd_watch() {
+	local interval=5 once=0 all=0
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			-n|--interval) shift; interval="${1:-5}" ;;
+			-1|--once)     once=1 ;;
+			--all)         all=1 ;;
+			-*) die "unknown flag: $1" ;;
+		esac
+		shift
+	done
+	local mode=""; [ "$all" = 1 ] && mode="all" || require_repo
+	trap 'printf "\ncrew watch: stopped\n"; exit 0' INT
+	local scope; [ "$all" = 1 ] && scope="all repos" || scope="$REPO_KEY"
+	[ "$once" = 1 ] || printf 'crew watch (%s): polling every %ss (Ctrl-C to stop)\n' "$scope" "$interval"
+
+	declare -A seen
+	while :; do
+		local d
+		while IFS= read -r d; do
+			[ -n "$d" ] || continue
+			local branch status key blocked wt ahead astat
+			branch=$(cat "$d/branch" 2>/dev/null || basename "$d")
+			status=$(cat "$d/status" 2>/dev/null || echo '?')
+			# running/interactive but the session/workspace is gone -> it exited unexpectedly
+			case "$status" in
+				running|interactive) crewmate_alive "$d" || status="exited" ;;
+			esac
+			blocked=$(grep -a -m1 'BLOCKED:' "$d/log" 2>/dev/null || true)
+			key="$status"; [ -n "$blocked" ] && key="blocked"
+			# Interactive herdr crewmates have no exit code; herdr's live agent status is
+			# the actionable signal instead (blocked -> decision needed, idle -> review).
+			if [ "$status" = "interactive" ] && [ "$(backend_for "$d")" = herdr ]; then
+				astat=$(herdr workspace get "$(cat "$d/workspace_id" 2>/dev/null)" 2>/dev/null \
+					| jq -r '.result.workspace.agent_status // "unknown"' 2>/dev/null) || astat="unknown"
+				case "$astat" in
+					blocked) key="blocked"; blocked="${blocked:-BLOCKED: agent is waiting on a permission/decision}" ;;
+					idle)    key="int-idle" ;;
+					*)       key="int-$astat" ;;
+				esac
+			fi
+			# de-dup per crewmate dir (unique across repos)
+			if [ "${seen[$d]:-}" != "$key" ]; then
+				case "$key" in
+					blocked)
+						notify "crew: $branch BLOCKED" "${blocked##*BLOCKED:} - needs a decision" ;;
+					done:0)
+						wt=$(cat "$d/worktree" 2>/dev/null || true)
+						ahead=$([ -d "$wt" ] && commits_ahead "$wt" "$d" || printf '?')
+						notify "crew: $branch ready for review" "done, $ahead commit(s) - /review-diff then /ship-gate" ;;
+					done:*)
+						notify "crew: $branch finished with errors ($key)" "check: crew logs $branch" ;;
+					int-idle)
+						wt=$(cat "$d/worktree" 2>/dev/null || true)
+						ahead=$([ -d "$wt" ] && commits_ahead "$wt" "$d" || printf '?')
+						notify "crew: $branch idle" "$ahead commit(s) - awaiting input/review: crew attach $branch" ;;
+					exited)
+						notify "crew: $branch exited unexpectedly" "session gone; check: crew logs $branch" ;;
+				esac
+				seen[$d]="$key"
+			fi
+		done < <(iter_state_dirs $mode)
+		[ "$once" = 1 ] && break
+		sleep "$interval"
+	done
+}
+
+cmd_ls() {
+	local fmt='#{session_name}  (#{session_windows}w, #{?session_attached,attached,detached})'
+	local out="" hout=""
+	[ "${1:-}" = "--all" ] || require_repo
+	if command -v tmux >/dev/null 2>&1; then
+		if [ "${1:-}" = "--all" ]; then
+			out=$(tmux list-sessions -F "$fmt" 2>/dev/null | grep "^${PREFIX}" || true)
+		else
+			out=$(tmux list-sessions -F "$fmt" 2>/dev/null | grep "^${PREFIX}${REPO_KEY}_" \
+				| sed "s#^${PREFIX}${REPO_KEY}_##" || true)
+		fi
+	fi
+	if command -v herdr >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 \
+		&& herdr workspace list >/dev/null 2>&1; then
+		local filter
+		if [ "${1:-}" = "--all" ]; then filter="^${PREFIX}"; else filter="^${PREFIX}${REPO_KEY}_"; fi
+		hout=$(herdr workspace list 2>/dev/null | jq -r --arg f "$filter" \
+			'.result.workspaces[] | select((.label // "") | test($f)) |
+			 "\(.label)  (\(.tab_count // 0)t/\(.pane_count // 0)p, \(.agent_status // "no agent")) [herdr]"' \
+			|| true)
+		[ "${1:-}" = "--all" ] || hout=$(printf '%s' "$hout" | sed "s#^${PREFIX}${REPO_KEY}_##")
+	fi
+	[ -n "$out" ] && printf '%s\n' "$out"
+	[ -n "$hout" ] && printf '%s\n' "$hout"
+	[ -n "$out$hout" ] || printf '(no crew sessions)\n'
+}
+
+cmd_attach() {
+	[ $# -ge 1 ] || die "usage: crew attach <branch>"
+	local name sdir
+	name=$(session_name "$1")
+	sdir=$(state_dir_for "$1")
+	if [ "$(backend_for "$sdir")" = herdr ]; then
+		crewmate_alive "$sdir" || die "no crew workspace for '$1' ($name)"
+	else
+		tmux has-session -t "$name" 2>/dev/null || die "no crew session for '$1' ($name)"
+	fi
+	enter_crewmate "$sdir" "$name"
+}
+
+cmd_stop() {
+	local branch="" del=0
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			-D) del=1 ;;
+			-*) die "unknown flag: $1" ;;
+			*) branch="$1" ;;
+		esac
+		shift
+	done
+	[ -n "$branch" ] || die "usage: crew stop <branch> [-D]"
+	local name sdir
+	name=$(session_name "$branch")
+	sdir=$(state_dir_for "$branch")
+
+	if [ "$(backend_for "$sdir")" = herdr ]; then
+		local ws; ws=$(cat "$sdir/workspace_id" 2>/dev/null || true)
+		if [ -n "$ws" ] && herdr workspace get "$ws" >/dev/null 2>&1; then
+			herdr workspace close "$ws" >/dev/null
+			printf 'closed workspace: %s (%s)\n' "$name" "$ws"
+		else
+			printf 'crew: no workspace %s\n' "$name"
+		fi
+	elif tmux has-session -t "$name" 2>/dev/null; then
+		tmux kill-session -t "$name"
+		printf 'killed session: %s\n' "$name"
+	else
+		printf 'crew: no session %s\n' "$name"
+	fi
+
+	rm -rf "$(state_dir_for "$branch")"
+
+	if [ "$del" -eq 1 ]; then
+		git wt rm "$branch" -D --force 2>/dev/null \
+			&& printf 'removed worktree + branch: %s\n' "$branch" \
+			|| printf 'crew: could not remove worktree for %s (remove manually)\n' "$branch" >&2
+	fi
+}
+
+cmd_help() { awk 'NR==1{next} /^#/{sub(/^#[ ]?/,""); print; next} {exit}' "$0"; }
+
+main() {
+	local sub="${1:-help}"; shift || true
+	case "$sub" in
+		new)            cmd_new "$@" ;;
+		status|st)      cmd_status "$@" ;;
+		logs|log)       cmd_logs "$@" ;;
+		watch)          cmd_watch "$@" ;;
+		ls|list)        cmd_ls "$@" ;;
+		attach)         cmd_attach "$@" ;;
+		stop|rm)        cmd_stop "$@" ;;
+		help|-h|--help) cmd_help ;;
+		*) die "unknown command: $sub (try: crew help)" ;;
+	esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+	main "$@"
+fi

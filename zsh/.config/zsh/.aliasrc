@@ -1,0 +1,196 @@
+# vim: filetype=zsh
+#
+#alias open="xdg-open"
+alias make="make -j`nproc`"
+alias ninja="ninja -j`nproc`"
+alias n="ninja"
+alias c="clear"
+alias rmpkg="sudo pacman -Rsn"
+alias cleanch="sudo pacman -Scc"
+alias fixpacman="sudo rm /var/lib/pacman/db.lck"
+alias update="sudo pacman -Syu"
+alias cat="bat --paging=never"
+alias du="dust"
+alias ps="procs"
+alias dig="doggo"
+alias dstart="sudo systemctl start docker"
+alias dstop="sudo systemctl stop docker.socket docker.service"
+alias dc="docker compose"
+alias k="kubectl"
+alias tf="terraform"
+alias j="just"
+alias gpr="gh pr create"
+alias gpc="gh pr checkout"
+alias commit='opencode run "/commit" --auto'
+
+# Help people new to Arch
+alias apt="man pacman"
+alias apt-get="man pacman"
+alias please="sudo"
+alias tb="nc termbin.com 9999"
+
+# Cleanup orphaned packages
+alias cleanup='sudo pacman -Rsn $(pacman -Qtdq)'
+
+# Get the error messages from journalctl
+alias jctl="journalctl -p 3 -xb"
+
+# Recent installed packages
+alias rip="expac --timefmt='%Y-%m-%d %T' '%l\t%n %v' | sort | tail -200 | nl"
+
+alias ls="eza -g -G --icons"
+alias la="ls -a"
+alias g=git
+alias python=python3
+# alias vi=vim
+alias t=tmux
+alias ta="tmux a"
+# alias backup="python ~/OneDrive/Back\ Up/backup_script.py"
+alias fin=fzf
+alias yt=youtube-dl
+alias top=btop
+alias ll="eza -l -g --icons"
+alias lla="ll -a"
+
+alias bladeformatter="blade-formatter"
+
+alias lg="lazygit"
+
+# yazi: cd into directory on quit
+function y() {
+    local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
+    yazi "$@" --cwd-file="$tmp"
+    if cwd="$(command cat -- "$tmp")" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
+        builtin cd -- "$cwd"
+    fi
+    rm -f -- "$tmp"
+}
+
+alias ssh='TERM=xterm-256color ssh'
+if [[ "$(uname)" == "Linux" ]]; then
+  if grep -qi microsoft /proc/version; then
+    # This is WSL
+    alias open='explorer.exe'
+  else
+    # This is native Linux
+    function open() { nautilus "${@:-.}" &>/dev/null & disown; }
+  fi
+fi
+
+alias pn=pnpm
+
+# Unified quota table for installed coding agents.
+alias aiu="ai-usage"
+
+# Switch between saved Claude and native Codex logins. With no profile, opens fzf.
+alias claude-account="ai-account switch claude"
+alias codex-account="ai-account switch codex"
+alias claude-account-login="ai-account login claude"
+alias codex-account-login-native="ai-account login codex"
+
+# Ollama (local LLM)
+alias ai-start="sudo systemctl start ollama.service"
+alias ai-stop="sudo systemctl stop ollama.service"
+alias ai-status="systemctl status ollama.service"
+
+alias ide="source ~/devbox-config/zsh/.config/zsh/ide_session.sh"
+
+
+# vim related (use nvim for neovim and vim for lazyvim)
+# Alias for launching nvim with decrypted API keys
+# alias nvim='ANTHROPIC_API_KEY="$(gpg --pinentry-mode loopback --decrypt ~/anthropic_api_key.gpg 2>/dev/null)" OPENAI_API_KEY="$(gpg --pinentry-mode loopback --decrypt ~/openai_api_key.gpg 2>/dev/null)" DEEPINFRA_API_KEY="$(gpg --pinentry-mode loopback --decrypt ~/deepinfra_api_key.gpg 2>/dev/null)" nvim'
+# Redirect vim command to nvim
+alias vim=nvim
+
+# explicit reload of zprofile
+alias reload-secrets='source ~/.zprofile'
+alias encs='encrypt_secrets'
+alias load-secrets='load_secrets'
+
+# android emulator - for fix related to qt
+alias emulator='QT_QPA_PLATFORM=xcb DISPLAY=:1 emulator'
+alias pixel='emulator -avd Pixel_10 &>/dev/null &'
+
+# Keep system awake when lid is closed (inhibits logind lid-switch)
+# Usage:
+#   lid-keep-awake          # start in background, persists for the session
+#   lid-keep-awake stop     # stop the inhibitor
+#   lid-keep-awake status   # show current inhibitors
+function lid-keep-awake() {
+    case "${1:-start}" in
+        stop)
+            pkill -f 'systemd-inhibit.*lid-keep-awake' && echo "lid-keep-awake: stopped"
+            ;;
+        status)
+            systemd-inhibit --list | grep -E 'lid-keep-awake|handle-lid-switch' || echo "no lid inhibitor active"
+            ;;
+        start|"")
+            if pgrep -f 'systemd-inhibit.*lid-keep-awake' >/dev/null; then
+                echo "lid-keep-awake: already running"
+                return 0
+            fi
+            nohup systemd-inhibit \
+                --what=handle-lid-switch \
+                --who=lid-keep-awake \
+                --why="user requested" \
+                --mode=block \
+                sleep infinity >/dev/null 2>&1 &
+            disown
+            echo "lid-keep-awake: started (pid $!)"
+            ;;
+        *)
+            echo "usage: lid-keep-awake [start|stop|status]"
+            ;;
+    esac
+}
+
+
+
+# wt — cd into (or create + cd into) a sibling git worktree.
+# Backed by the `git-wt` script (~/.local/bin/git-wt). An external binary
+# cannot change the parent shell's cwd, so this wrapper handles the `cd`.
+#
+#   wt <task...>           AI-name a branch from the task, create the worktree + cd
+#   wt <existing>          cd into an existing worktree/branch (no AI)
+#   wt -b <name> [start]   create/reuse an explicit branch (opt. from <start>) + cd
+#   wt <sub> ...           pass through to git-wt (list|rm|path|prune|new|add|help)
+function wt() {
+    case "${1:-}" in
+        ""|help|-h|--help)
+            git wt help
+            ;;
+        list|ls|rm|remove|prune|path|new|add)
+            git wt "$@"
+            ;;
+        -b|--branch)
+            # Explicit branch: cd if the worktree exists, else create (opt. from
+            # <start>) then cd.
+            shift
+            local branch="$1"; shift
+            [ -n "$branch" ] || { git wt new; return $?; }
+            local dir
+            if dir=$(git wt path "$branch" 2>/dev/null); then
+                cd "$dir"
+            else
+                git wt new "$branch" "$@" || return $?
+                dir=$(git wt path "$branch") && cd "$dir"
+            fi
+            ;;
+        *)
+            # Existing worktree/branch -> just cd. Otherwise treat the args as a
+            # task and let AI name the branch.
+            local dir branch
+            if dir=$(git wt path "$1" 2>/dev/null); then
+                cd "$dir"
+            elif git show-ref --verify --quiet "refs/heads/$1"; then
+                git wt new "$1" || return $?
+                dir=$(git wt path "$1") && cd "$dir"
+            else
+                branch=$(ai-branch-name "$@") || return $?
+                print -r -- "→ branch: $branch"
+                git wt new "$branch" || return $?
+                dir=$(git wt path "$branch") && cd "$dir"
+            fi
+            ;;
+    esac
+}
