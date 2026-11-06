@@ -24,7 +24,7 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 | Install only some parts | `make stow PKG="agents opencode nvim"` |
 | Remove a part | `make unstow PKG="nvim"` |
 | Also set up the zsh config | `./setup.sh --shell` |
-| See usage and quota for every agent | `ai-usage` (or the menu bar) |
+| See usage and quota for every agent | `ai-usage` (or the menu bar; on Linux `ai-usage-bar`) |
 | Run parallel agents in worktrees | `crew new "<task>" --claude` (see `agent-orchestration`) |
 | Run and message agents in Rex | `rex-agents spawn <name> -C <dir> -- claude`, `rex-agents send <name> "..."` |
 | Edit a config | change the file in `$HOME` (it is a symlink), then `git commit` here |
@@ -37,6 +37,8 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 
 - *System monitor*: CPU, RAM, disk, battery and network at a glance, turning orange or red only when something needs attention.
 - *AI usage*: quota left, reset timers and a burn-rate forecast per agent, with alerts and per-agent icons. Details in [`swiftbar/README.md`](swiftbar/README.md).
+
+**On Linux** the same AI usage view works in waybar, tmux or any bar through `ai-usage-bar` (setup in [`docs/LINUX-STATUSBAR.md`](docs/LINUX-STATUSBAR.md)). The `ai-usage` command itself runs on both macOS and Linux.
 
 **Rex terminal support** (Superlogical Rex): keybindings in `rex/.config/rex/init.lua` (tmux-style `ctrl+q` prefix), plus `rex-agents` to start agents, message them, read their screens and get notified when one finishes or needs you. See [Using Rex](#using-rex).
 

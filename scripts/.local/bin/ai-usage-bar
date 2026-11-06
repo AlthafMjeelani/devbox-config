@@ -1,0 +1,103 @@
+#!/usr/bin/env bun
+// ai-usage-bar - AI quota for status bars on Linux (and anywhere that is not SwiftBar).
+//
+//   ai-usage-bar                    one plain line:  ✺ Cl 8%▲ 5h ↻59m  ϟ Amp 90%  +4 ok
+//   ai-usage-bar --format waybar    JSON for a waybar custom module (text, tooltip, class, percentage)
+//   ai-usage-bar --format tmux      same line with tmux color codes, for status-right
+//   ai-usage-bar --notify           also send desktop notifications on changes (notify-send)
+//
+// Same logic as the macOS menu bar (swiftbar/): attention first, best agent next, rest collapsed,
+// alerts only on transitions, last good result when ai-usage fails. Reads `ai-usage --json`.
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import {
+  connected, diffAlerts, glyphOf, pickBest, poolSeverities, poolSeverity, selectMenubar, summarizeAgents, until, worstRow, leftOf,
+  type Pool, type Sev,
+} from "../../../swiftbar/.config/swiftbar/lib/aiusage.ts";
+
+const args = process.argv.slice(2);
+const format = args.includes("--format") ? args[args.indexOf("--format") + 1] : "text";
+const notify = args.includes("--notify");
+if (args.includes("-h") || args.includes("--help")) {
+  console.log(fs.readFileSync(import.meta.path, "utf8").split("\n").slice(1, 9).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
+  process.exit(0);
+}
+if (!["text", "waybar", "tmux"].includes(format)) { console.error(`ai-usage-bar: unknown format '${format}'`); process.exit(2); }
+
+const bin = path.join(os.homedir(), ".local/bin");
+const env = { ...process.env, PATH: `${bin}:/usr/local/bin:/opt/homebrew/bin:${process.env.PATH ?? ""}` };
+const cacheDir = path.join(process.env.XDG_CACHE_HOME ?? path.join(os.homedir(), ".cache"), "ai-usage");
+const lastGood = path.join(cacheDir, "bar-last.json");
+const stateFile = path.join(cacheDir, "bar-state.json");
+function readJson<T>(f: string): T | null {
+  try { return JSON.parse(fs.readFileSync(f, "utf8")) as T; } catch { return null; }
+}
+function writeJson(f: string, v: unknown) {
+  try { fs.mkdirSync(cacheDir, { recursive: true }); fs.writeFileSync(f, JSON.stringify(v)); } catch {}
+}
+
+let pools: Pool[] = [];
+let stale = false;
+const result = spawnSync(path.join(bin, "ai-usage"), ["--json"], { env, encoding: "utf8", timeout: 60_000 });
+try {
+  if (result.status !== 0) throw new Error("ai-usage failed");
+  pools = JSON.parse(result.stdout);
+  writeJson(lastGood, { at: Date.now(), pools });
+} catch {
+  const snap = readJson<{ pools: Pool[] }>(lastGood);
+  if (!snap) {
+    const msg = "AI --";
+    console.log(format === "waybar" ? JSON.stringify({ text: msg, tooltip: "ai-usage failed", class: "unknown" }) : msg);
+    process.exit(0);
+  }
+  pools = snap.pools;
+  stale = true;
+}
+
+if (notify && !stale) {
+  const alerts = diffAlerts(readJson<Record<string, Sev>>(stateFile), pools);
+  for (const a of alerts) spawnSync("notify-send", ["-a", "ai-usage", a.title, a.body]);
+  writeJson(stateFile, poolSeverities(pools));
+}
+
+const SHORT: Record<string, string> = { Codex: "Cx", Claude: "Cl", Amp: "Amp", Antigravity: "AG", Kimi: "Km", CommandCode: "CC", OpenCode: "OC" };
+const TMUX_COLOR: Record<Sev, string> = { ok: "green", warn: "yellow", crit: "red" };
+const summaries = summarizeAgents(pools);
+const best = pickBest(pools);
+const { shown, hidden, hiddenAttention } = selectMenubar(summaries, best?.agent, 3);
+
+const segment = (s: (typeof shown)[number]) => {
+  const name = SHORT[s.agent] ?? s.agent.slice(0, 3);
+  if (!s.row || s.left === null) return { text: `${glyphOf(s.agent)} ${name} --`, sev: null as Sev | null };
+  const flag = s.sev === "ok" ? "" : "▲";
+  const win = s.row.limit === "-" ? "" : ` ${s.row.limit}`;
+  const reset = s.row.resetAt ? ` ↻${until(s.row.resetAt)}` : "";
+  return { text: `${glyphOf(s.agent)} ${name} ${Math.round(s.left)}%${flag}${win}${reset}`, sev: s.sev };
+};
+const segs = shown.map(segment);
+const tail = hidden > 0 ? (hiddenAttention > 0 ? `+${hidden} (${hiddenAttention}▲)` : `+${hidden} ok`) : "";
+const staleMark = stale ? "⟳stale" : "";
+const plain = [...segs.map((s) => s.text), tail, staleMark].filter(Boolean).join("  ") || "AI --";
+
+if (format === "text") {
+  console.log(plain);
+} else if (format === "tmux") {
+  const parts = segs.map((s) => (s.sev ? `#[fg=${TMUX_COLOR[s.sev]}]${s.text}#[default]` : s.text));
+  console.log([...parts, tail, staleMark].filter(Boolean).join("  ") || "AI --");
+} else {
+  const attention = summaries.filter((s) => s.sev === "crit" || s.sev === "warn");
+  const cls = summaries.some((s) => s.sev === "crit") ? "critical" : attention.length ? "warning" : summaries.length ? "ok" : "unknown";
+  const lines: string[] = [];
+  for (const p of pools.filter(connected)) {
+    const w = worstRow(p.rows);
+    const left = w ? leftOf(w) : p.left;
+    const sev = poolSeverity(p);
+    lines.push(`${glyphOf(p.agent)} ${p.agent}: ${left === null ? "--" : `${Math.round(left)}% left`}${w && w.limit !== "-" ? ` (${w.limit})` : ""}${w?.resetAt ? `, resets in ${until(w.resetAt)}` : ""}${sev === "crit" ? "  CRITICAL" : sev === "warn" ? "  LOW" : ""}`);
+  }
+  if (best) lines.unshift(`Use first: ${best.agent}`, "");
+  if (stale) lines.push("", "Showing the last good result (ai-usage failed)");
+  const minLeft = Math.min(...summaries.map((s) => s.left ?? 100), 100);
+  console.log(JSON.stringify({ text: plain, tooltip: lines.join("\n"), class: cls, percentage: Math.round(minLeft) }));
+}

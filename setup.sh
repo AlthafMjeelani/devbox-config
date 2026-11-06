@@ -209,6 +209,7 @@ for dir in "$HOME/.claude/skills" "$HOME/.agents/skills" "$HOME/.config/opencode
   fi
 done
 if make verify-agent-workflow >/tmp/devbox-verify.log 2>&1; then ok "make verify-agent-workflow passed"; else warn "verify-agent-workflow reported problems, see /tmp/devbox-verify.log"; fi
+if [ "$PLATFORM" = linux ]; then ok "AI usage in your bar: see docs/LINUX-STATUSBAR.md (waybar, tmux: ai-usage-bar)"; fi
 case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) warn 'Add to your shell profile: export PATH="$HOME/.local/bin:$PATH"' ;; esac
 
 printf '\n%sDone.%s Restart your terminal and your coding agents so they pick up the new skills.\n' "$G$B" "$N"

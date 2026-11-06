@@ -24,6 +24,17 @@ make stow-scripts     # or: make restow-scripts to pick up new files
 - `gate` - local AI ship gate: validate in a disposable worktree, then push + PR (see below).
 - `amp-global-sync` - sync the orb-safe skill/plugin subset into local Amp Personal repository checkouts without committing or pushing.
 
+## ai-usage-bar - AI quota for Linux status bars
+
+One-line or JSON output of the same view as the macOS menu bar, for waybar, tmux and similar. See `docs/LINUX-STATUSBAR.md`.
+
+```bash
+ai-usage-bar                   # plain line
+ai-usage-bar --format waybar   # JSON for waybar
+ai-usage-bar --format tmux     # tmux colors
+ai-usage-bar --notify          # desktop notifications on changes
+```
+
 ## ai-account - Claude and Codex login profiles
 
 Import the account that is currently logged in, then log in to a second account:
