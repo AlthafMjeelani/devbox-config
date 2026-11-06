@@ -1,0 +1,78 @@
+#!/usr/bin/env bun
+// agent-route - pick the model tier and reasoning effort for a task, for any agent.
+//
+//   agent-route "task description" [--files N] [--engine codex|claude|opencode|all] [--json]
+//   agent-route --tier "task"      Print only the tier (fast|standard|deep); used by `crew --profile auto`.
+//
+// Default is cheap: low effort. It escalates only on risk or size signals (security, auth, payments,
+// migrations, concurrency, architecture, many files). Tune the word lists below.
+import fs from "node:fs";
+
+export type Tier = "fast" | "standard" | "deep";
+export type Effort = "low" | "medium" | "high";
+
+const DEEP: [RegExp, number][] = [
+  [/\b(security|vulnerab|exploit|auth(entication|orization)?|oauth|permission|encrypt|crypto|secret)\b/i, 3],
+  [/\b(payment|billing|checkout|invoice|money|refund)\b/i, 3],
+  [/\b(migrat(e|ion)|schema change|data loss|backfill|irreversible)\b/i, 3],
+  [/\b(race condition|deadlock|concurren|memory leak|root cause|flaky|intermittent)\b/i, 3],
+  [/\b(architect|redesign|rewrite|re-?platform|system design|monorepo)\b/i, 2],
+  [/\b(refactor|performance|optimi[sz]e|scal(e|ability)|distributed)\b/i, 1],
+  [/\b(plan|investigate|debug|diagnose)\b/i, 1],
+];
+const FAST: [RegExp, number][] = [
+  [/\b(typo|rename|comment|format|lint|prettier|readme|changelog|commit message|branch name|docstring|bump version)\b/i, 2],
+  [/\b(summari[sz]e|list|explain|translate|boilerplate|scaffold)\b/i, 1],
+];
+
+export function score(task: string, files = 0): number {
+  let s = 0;
+  for (const [re, w] of DEEP) if (re.test(task)) s += w;
+  for (const [re, w] of FAST) if (re.test(task)) s -= w;
+  if (files >= 15) s += 3; else if (files >= 6) s += 2; else if (files >= 3) s += 1;
+  if (task.length > 600) s += 1;
+  return s;
+}
+
+export function route(task: string, files = 0): { tier: Tier; effort: Effort; score: number } {
+  const s = score(task, files);
+  if (s <= -1) return { tier: "fast", effort: "low", score: s };
+  if (s <= 2) return { tier: "standard", effort: "low", score: s };
+  if (s <= 5) return { tier: "deep", effort: "medium", score: s };
+  return { tier: "deep", effort: "high", score: s };
+}
+
+const MODELS = {
+  codex: { fast: "gpt-6-luna", standard: "gpt-6.1-terra", deep: "gpt-6.1-sol" },
+  claude: { fast: "haiku", standard: "sonnet", deep: "opus" },
+  opencode: { fast: "openai/gpt-6-luna-low", standard: "openai/gpt-6.1-terra", deep: "openai/gpt-6.1-sol" },
+} as const;
+
+export function command(engine: keyof typeof MODELS, tier: Tier, effort: Effort): string {
+  const m = MODELS[engine][tier];
+  if (engine === "codex") return `codex -m ${m} -c model_reasoning_effort=${effort}`;
+  if (engine === "claude") return `claude --model ${m}${effort === "low" ? "" : ` --effort ${effort}`}`;
+  return `opencode --model ${m}`;
+}
+
+if (import.meta.main) {
+  const a = process.argv.slice(2);
+  if (a.includes("-h") || a.includes("--help") || !a.length) {
+    console.log(fs.readFileSync(import.meta.path, "utf8").split("\n").slice(1, 6).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
+    process.exit(a.length ? 0 : 2);
+  }
+  const val = (f: string) => { const i = a.indexOf(f); return i >= 0 ? a[i + 1] : undefined; };
+  const skip = new Set<number>();
+  for (const f of ["--files", "--engine"]) { const i = a.indexOf(f); if (i >= 0) { skip.add(i); skip.add(i + 1); } }
+  const task = a.filter((x, i) => !x.startsWith("--") && !skip.has(i)).join(" ");
+  const r = route(task, Number(val("--files") ?? 0));
+  if (a.includes("--tier")) { console.log(r.tier); process.exit(0); }
+  const eng = (val("--engine") ?? "all") as string;
+  const engines = (eng === "all" ? Object.keys(MODELS) : [eng]) as (keyof typeof MODELS)[];
+  const cmds = Object.fromEntries(engines.map((e) => [e, command(e, r.tier, r.effort)]));
+  if (a.includes("--json")) console.log(JSON.stringify({ ...r, commands: cmds }, null, 2));
+  else {
+    console.log(`tier: ${r.tier}   effort: ${r.effort}   (score ${r.score})`);
+    for (const [e, c] of Object.entries(cmds)) console.log(`${e.padEnd(9)} ${c}`);
+  }
+}

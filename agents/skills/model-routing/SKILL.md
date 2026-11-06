@@ -28,3 +28,16 @@ Antigravity: `gemini-3.1-pro-high` for deep and standard, `gemini-3.6-flash-*` f
 - Claude Code: `/model` to switch; subagents set `model:` in their frontmatter (generated from `models.json`).
 - Codex: `codex -p fast|standard|deep` (profiles in `~/.codex/config.toml`), or `-m <model> -c model_reasoning_effort="low"`; `/model` inside a session.
 - crew: `crew new "<task>" --codex --profile fast|standard|deep`.
+
+## Automatic routing (all agents)
+Before starting a task, or when splitting work into subtasks, run:
+
+```sh
+agent-route "short task description" --files <how many files you expect to touch>
+```
+
+It prints the tier, the effort, and the exact launch command for Codex, Claude and OpenCode. Default is low effort; it escalates to Sol/Opus and medium or high only for risk or size signals (security, auth, payments, migrations, concurrency, architecture, many files). Follow it:
+- If it says a higher tier than the current session, suggest switching (`/model`) or hand that subtask to a subagent launched with the printed command.
+- If it says fast, do not spend the big model on it.
+- `crew new --profile auto "task"` applies it automatically per crewmate.
+Edit the word lists at the top of `agent-route` to tune it.

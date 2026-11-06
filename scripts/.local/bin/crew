@@ -19,7 +19,7 @@
 #                                        --attach (jump to it), --claude, --codex, --kimi, --amp,
 #                                        --commandcode,
 #                                        --headless (accepted for compatibility; tasked runs
-#                                        are always bounded), --profile fast|standard|deep,
+#                                        are always bounded), --profile fast|standard|deep|auto,
 #                                        --start <ref> (branch start-point).
 #   crew status [branch] [--all]  Report crewmates: engine, profile, model, running/done, commits, last log line.
 #   crew logs <branch> [-f]       Print (or follow with -f) a crewmate's captured output.
@@ -454,6 +454,10 @@ cmd_new() {
 	git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not inside a git repository"
 	require_engine_command "$engine"
 	[ "$engine" != claude ] || command -v jq >/dev/null 2>&1 || die "jq is required for Claude activity logs"
+	if [ "$profile" = auto ]; then
+		command -v agent-route >/dev/null 2>&1 || die "--profile auto needs agent-route on PATH (run: make restow)"
+		profile=$(agent-route --tier "$task")
+	fi
 	local model; model=$(resolve_profile "$profile" "$engine")
 	[ "$engine" != amp ] || [ -r "$AMP_CREW_SETTINGS" ] \
 		|| die "Amp safety settings not found: $AMP_CREW_SETTINGS"

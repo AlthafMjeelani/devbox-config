@@ -107,3 +107,4 @@ Postman CLI is installed on this device, and can be used for API Engineering wor
 ## Multi-agent work
 - For parallel or multi-step agent work, follow `agent-orchestration`; for handoffs and messages between agents, follow `agent-communication`.
 - Inside a Rex terminal (`REX_SESSION` is set), use `rex-terminal` and `rex-agents` to run, message and monitor other agents.
+- Pick the model and effort per task with `agent-route "<task>" --files N` (see `model-routing`). Default low; escalate only when it says so.

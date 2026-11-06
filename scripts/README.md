@@ -326,3 +326,10 @@ agentic-init [dir] --dry-run   # show what would be created
 agentic-init [dir]             # create AGENTS.md, CLAUDE.md link, docs/*, .env.example (never overwrites)
 agentic-init [dir] --check     # list missing files and leftover TODO markers
 ```
+
+## agent-route - model and effort per task
+
+```sh
+agent-route "debug race condition in auth refresh" --files 6   # tier, effort, launch command per engine
+agent-route --tier "fix typo"                                  # just the tier (used by crew --profile auto)
+```
