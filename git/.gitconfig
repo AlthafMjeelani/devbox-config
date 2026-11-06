@@ -3,6 +3,7 @@
 	email = althafmdev@gmail.com
 
 [core]
+	hooksPath = ~/.config/git/hooks
 	excludesfile = ~/.gitignore_global
 	editor = nvim
 	pager = delta

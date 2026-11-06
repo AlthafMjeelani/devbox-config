@@ -35,6 +35,17 @@ ai-usage-bar --format tmux     # tmux colors
 ai-usage-bar --notify          # desktop notifications on changes
 ```
 
+## guard-default-branch - keep agents off main
+
+Blocks commits and Claude Code edits on `main`, `master`, `develop`, `trunk` and a repo's default branch. Used by the global git `pre-commit` hook and a Claude Code `PreToolUse` hook.
+
+```bash
+guard-default-branch check [dir]            # exit 1 on a protected branch
+guard-default-branch install-claude-hook    # merge the hook into ~/.claude/settings.json
+ALLOW_DEFAULT_BRANCH=1 git commit ...       # one-off override
+git config devbox.allowDefaultBranch true   # allow in one repo
+```
+
 ## ai-account - Claude and Codex login profiles
 
 Import the account that is currently logged in, then log in to a second account:

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Global git hook runner. Every hook name below is a symlink to this file.
+# 1) pre-commit refuses commits on main/master/develop (see guard-default-branch).
+# 2) Then it runs the repo's own hook from .git/hooks, because a global core.hooksPath would otherwise hide it.
+hook="$(basename "$0")"
+if [ "$hook" = pre-commit ]; then
+  guard="$(command -v guard-default-branch 2>/dev/null || true)"
+  [ -n "$guard" ] || guard="$HOME/.local/bin/guard-default-branch"
+  if [ -x "$guard" ]; then "$guard" check . || exit 1; fi
+fi
+common="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+local_hook="$common/hooks/$hook"
+if [ -n "$common" ] && [ -x "$local_hook" ] && [ "$local_hook" != "$0" ]; then exec "$local_hook" "$@"; fi
+exit 0

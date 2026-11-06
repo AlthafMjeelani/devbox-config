@@ -27,6 +27,7 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 | See usage and quota for every agent | `ai-usage` (or the menu bar; on Linux `ai-usage-bar`) |
 | Run parallel agents in worktrees | `crew new "<task>" --claude` (see `agent-orchestration`) |
 | Run and message agents in Rex | `rex-agents spawn <name> -C <dir> -- claude`, `rex-agents send <name> "..."` |
+| Allow commits on `main` in one repo | `git config devbox.allowDefaultBranch true` |
 | Edit a config | change the file in `$HOME` (it is a symlink), then `git commit` here |
 
 ## What you get
@@ -71,6 +72,13 @@ If Rex says the CLI is not allowed, turn on Remote Control in Rex settings. `rex
 | `agents/AGENTS.md` (this repo) | every agent, every project, via `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and the other links | the **coding workflow** (read the project's `AGENTS.md` first, always work on a feature branch), safety, commits, quality bar |
 | `AGENTS.md` in each project repo | that project only | stack, commands, conventions, folder map, branch and PR rules for the team |
 | `agents/.claude/settings.json`, `agents/.codex/rules/default.rules` | one tool | hard permissions, for example denying `git push` |
+
+**Enforced, not just asked.** `guard-default-branch` blocks work on `main`, `master`, `develop`, `trunk` and a repo's default branch in two places:
+
+- *Git*: a global `pre-commit` hook (`git/.config/git/hooks`) refuses commits on those branches for every agent and for you. Repo-local hooks still run through it.
+- *Claude Code*: a `PreToolUse` hook blocks Edit and Write on those branches, with a message telling the agent to run `git switch -c feat/<topic>`. `./setup.sh` installs it into `~/.claude/settings.json` (a backup is kept); or run `guard-default-branch install-claude-hook`.
+
+Allow it deliberately: `ALLOW_DEFAULT_BRANCH=1 git commit ...` once, or `git config devbox.allowDefaultBranch true` for one repo. Do that in this dotfiles repo if you commit straight to `main` here. Repos that set their own `core.hooksPath` (husky) skip the git hook, but the Claude hook still applies.
 
 Edit `agents/AGENTS.md`, commit, and every agent picks it up on its next session. Keep it short, because it loads into every agent's context. Put project details in the project's own `AGENTS.md`, not here.
 
@@ -167,6 +175,7 @@ make verify-agent-workflow
 | `stow` or `bun` not found | Run `./setup.sh`, or install them yourself. |
 | `agents-sync` can't find the repo | Run it from inside `~/devbox-config`. |
 | Menu bar plugin shows nothing | Check SwiftBar's plugin folder is `~/.config/swiftbar/plugins` and Bun is installed. |
+| "Blocked: you are on 'main'" | Intended. `git switch -c feat/<topic>`, or see the override above. |
 | `command not found: ai-usage` | Add `export PATH="$HOME/.local/bin:$PATH"` to your shell profile. |
 
 More detail: [`agents/README.md`](agents/README.md) (agent setup) and [`scripts/README.md`](scripts/README.md) (CLI tools).

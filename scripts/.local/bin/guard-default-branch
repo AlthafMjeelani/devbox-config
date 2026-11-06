@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+# guard-default-branch - keep coding agents (and commits) off main/master/develop.
+#
+#   guard-default-branch check [dir]          Exit 1 with a message if dir is on a protected branch.
+#   guard-default-branch claude-hook          Claude Code PreToolUse hook: reads the tool call JSON on stdin,
+#                                             exits 2 (block) when the file being edited is on a protected branch.
+#   guard-default-branch install-claude-hook  Merge that hook into ~/.claude/settings.json (idempotent, keeps a backup).
+#
+# Protected: main, master, develop, trunk, and the repo's own default branch (origin/HEAD).
+# Allow on purpose:  ALLOW_DEFAULT_BRANCH=1 <command>      one time
+#                    git config devbox.allowDefaultBranch true   for one repo (for example your dotfiles)
+set -euo pipefail
+
+protected() {
+  local branch="$1" dir="$2" default
+  case "$branch" in main|master|develop|trunk) return 0 ;; esac
+  default="$(git -C "$dir" symbolic-ref --short -q refs/remotes/origin/HEAD 2>/dev/null || true)"
+  [ -n "$default" ] && [ "$branch" = "${default#origin/}" ]
+}
+
+allowed() {
+  [ "${ALLOW_DEFAULT_BRANCH:-}" = 1 ] && return 0
+  [ "$(git -C "$1" config --get devbox.allowDefaultBranch 2>/dev/null || true)" = true ]
+}
+
+check() {
+  local dir="${1:-.}" branch
+  git -C "$dir" rev-parse --show-toplevel >/dev/null 2>&1 || return 0   # not a git repo
+  branch="$(git -C "$dir" symbolic-ref --short -q HEAD 2>/dev/null || true)"
+  [ -n "$branch" ] || return 0                                           # detached HEAD (rebase, checkout of a tag)
+  protected "$branch" "$dir" || return 0
+  allowed "$dir" && return 0
+  cat >&2 <<MSG
+Blocked: you are on '$branch', the default branch. Work on a feature branch instead:
+  git switch -c feat/<short-topic>      (or fix/, chore/, docs/, refactor/)
+One-off override: ALLOW_DEFAULT_BRANCH=1.  Per repo: git config devbox.allowDefaultBranch true
+MSG
+  return 1
+}
+
+claude_hook() {
+  command -v jq >/dev/null 2>&1 || exit 0
+  local input path dir
+  input="$(cat)"
+  path="$(printf '%s' "$input" | jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' 2>/dev/null || true)"
+  [ -n "$path" ] || exit 0
+  dir="$(dirname "$path")"
+  while [ ! -d "$dir" ] && [ "$dir" != "/" ]; do dir="$(dirname "$dir")"; done   # new files in new folders
+  check "$dir" || exit 2
+}
+
+install_claude_hook() {
+  command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
+  local file="$HOME/.claude/settings.json" real tmp
+  mkdir -p "$HOME/.claude"
+  [ -e "$file" ] || echo '{}' > "$file"
+  real="$(readlink -f "$file")"
+  if jq -e '[.hooks.PreToolUse[]?.hooks[]?.command] | any(test("guard-default-branch"))' "$real" >/dev/null 2>&1; then
+    echo "Claude hook already installed."; return 0
+  fi
+  cp "$real" "$real.bak-guard"
+  tmp="$(mktemp)"
+  jq '.hooks.PreToolUse = ((.hooks.PreToolUse // []) + [{"matcher":"Edit|Write|MultiEdit|NotebookEdit","hooks":[{"type":"command","command":"~/.local/bin/guard-default-branch claude-hook","timeout":10}]}])' "$real" > "$tmp"
+  cat "$tmp" > "$real"; rm -f "$tmp"
+  echo "Installed the Claude Code hook (backup: $real.bak-guard)."
+}
+
+case "${1:-}" in
+  check) shift; check "${1:-.}" ;;
+  claude-hook) claude_hook ;;
+  install-claude-hook) install_claude_hook ;;
+  -h|--help|help|"") sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//' ;;
+  *) echo "unknown command: $1 (try --help)" >&2; exit 2 ;;
+esac

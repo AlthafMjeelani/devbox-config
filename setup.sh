@@ -136,6 +136,15 @@ run make agents-sync
 run make stow PKG="$PKGS"
 [ "$DRY" = 0 ] && ok "Linked: $PKGS"
 
+# ---- 3a. Branch guard (agents stay on feature branches) --------------------------------------
+step "3a Branch guard"
+if have jq && { [ -d "$HOME/.claude" ] || have claude; }; then
+  run "$REPO/scripts/.local/bin/guard-default-branch" install-claude-hook
+else
+  ok "Claude Code not found (hook installs with: guard-default-branch install-claude-hook)"
+fi
+ok "Git hooks block commits on main/master/develop. Override: ALLOW_DEFAULT_BRANCH=1 or git config devbox.allowDefaultBranch true"
+
 # ---- 3b. Rex terminal ------------------------------------------------------------------------
 if printf '%s' " $PKGS " | grep -q ' rex '; then
   step "3b Rex terminal"
