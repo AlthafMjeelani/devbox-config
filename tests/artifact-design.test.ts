@@ -11,6 +11,10 @@ const pack = [
   "infographic-diagram", "technical-documentation", "screenshot-documentation",
   "interactive-prototyping", "artifact-quality-review", "business-presentation", "educational-content",
   "proposal-writing", "prototyping-proposals", "premium-artifact-design-director",
+  "senior-backend-engineer", "auth-and-identity", "fullstack-type-safety", "react-state-and-query",
+  "flutter-native-and-release", "flutter-ui-ux-design", "poster-and-social-media-design",
+  "svg-logo-and-icon-design", "web-motion-and-microinteractions", "print-and-publication-documents",
+  "admin-panel-dashboard-design",
   ...upstream.map((skill) => skill.name),
 ];
 
