@@ -52,6 +52,18 @@ OpenCode keeps thin slash-command wrappers where model routing is useful.
 > its skill picker shows duplicates, drop one discovery path - but skills key by name, so
 > it usually dedupes.
 
+## Professional Document and Design Pack
+
+The shared set includes `professional-artifact-design` plus focused companions for storytelling, data visualisation, diagrams, technical documentation, screenshot walkthroughs, interactive prototypes, artifact review, business presentations and educational content.
+Use the master skill with the host's installed PPTX, PDF, DOCX, XLSX or frontend skill; it adds content/design standards rather than replacing a format engine.
+The master includes reusable theme tokens and format-specific references.
+Sample figures must be labelled, real capabilities must be grounded in evidence, and final exports must be rendered and reviewed.
+
+These skills live under the same canonical directory and reach all seven agents through the existing shared links.
+After adding or pulling them, run `make agents-sync && make restow-agents`.
+Start a new session or refresh skills in each host to discover additions.
+The optional Anthropic foundation links and Claude-only marketplace commands are documented in `professional-artifact-design/references/tooling.md`; they are not installed by the shared pack.
+
 ## Generated Subagents
 
 OpenCode remains the canonical source for role prompts:

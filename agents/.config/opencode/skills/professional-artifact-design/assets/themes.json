@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "defaults": {
+    "font_family": "Arial",
+    "font_fallbacks": ["Aptos", "Inter", "sans-serif"],
+    "spacing_units": [8, 16, 24, 32, 48, 64],
+    "slide_aspect_ratio": "16:9",
+    "document_size": "A4",
+    "document_body_pt": 11,
+    "slide_heading_pt": 36,
+    "slide_body_pt": 22
+  },
+  "themes": {
+    "corporate-blue": {"primary": "#142C49", "accent": "#007E87", "canvas": "#F8FAFD", "surface": "#EAF2F8", "ink": "#142C49", "muted": "#536B82"},
+    "modern-minimal": {"primary": "#202B38", "accent": "#5264C8", "canvas": "#FFFFFF", "surface": "#F1F3F6", "ink": "#202B38", "muted": "#566272"},
+    "modern-emerald": {"primary": "#153E38", "accent": "#097969", "canvas": "#F7FBF9", "surface": "#E6F2ED", "ink": "#153E38", "muted": "#536B63"},
+    "creative-professional": {"primary": "#342851", "accent": "#A74321", "canvas": "#FFFCF8", "surface": "#F0EAF7", "ink": "#342851", "muted": "#675A74"}
+  }
+}

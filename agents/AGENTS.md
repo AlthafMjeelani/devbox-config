@@ -48,6 +48,10 @@ Project-specific rules live in each repo's own `AGENTS.md`.
 - Reviews: findings first, severity-tagged, one line of context each. Don't summarize a diff the user can read.
 - Prefer targeted `grep` / read over broad `find` / `cat`.
 
+## Business artifacts
+- For polished reports, presentations, workbooks or interactive deliverables, use `professional-artifact-design` with the installed format skill.
+  Apply `artifact-quality-review` before delivery; keep illustrative data and live verified results distinct.
+
 ## Kimi Code & Antigravity role routing
 When running under Kimi Code or Google Antigravity, compose shared skills with native subagents:
 - Reviewer: `code-review` + read-only inspection.
