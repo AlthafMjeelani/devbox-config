@@ -27,12 +27,13 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 | See usage and quota for every agent | `ai-usage` (or the menu bar; on Linux `ai-usage-bar`) |
 | Run parallel agents in worktrees | `crew new "<task>" --claude` (see `agent-orchestration`) |
 | Run and message agents in Rex | `rex-agents spawn <name> -C <dir> -- claude`, `rex-agents send <name> "..."` |
+| Check a project's env files and gitignore | `env-check` (add missing keys to `.env.example` with `env-check --sync`) |
 | Allow commits on `main` in one repo | `git config devbox.allowDefaultBranch true` |
 | Edit a config | change the file in `$HOME` (it is a symlink), then `git commit` here |
 
 ## What you get
 
-**One skill set for every agent.** All 120 skills live in `agents/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
+**One skill set for every agent.** All 122 skills live in `agents/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
 
 **A macOS menu bar** (SwiftBar) with two plugins:
 
@@ -42,6 +43,8 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 **On Linux** the same AI usage view works in waybar, tmux or any bar through `ai-usage-bar` (setup in [`docs/LINUX-STATUSBAR.md`](docs/LINUX-STATUSBAR.md)). The `ai-usage` command itself runs on both macOS and Linux.
 
 **Rex terminal support** (Superlogical Rex): keybindings in `rex/.config/rex/init.lua` (tmux-style `ctrl+q` prefix), plus `rex-agents` to start agents, message them, read their screens and get notified when one finishes or needs you. See [Using Rex](#using-rex).
+
+**Mobile and config rules for agents**: any mobile app request goes to Flutter first (`mobile-app-development`), and every project keeps a tracked `.env.example` with a safe `.gitignore` (`env-and-secrets`, `env-check`). This repo's own variables are in [`.env.example`](.env.example).
 
 **Dev tools in `~/.local/bin`**: `ai-usage`, `agents-sync`, `crew` (multi-agent tmux orchestrator), `gate` (local ship gate), `git-wt` (worktrees), `ai-account`, `agent-icons` and more. See [`scripts/README.md`](scripts/README.md).
 

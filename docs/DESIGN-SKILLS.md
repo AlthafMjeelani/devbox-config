@@ -118,3 +118,7 @@ Do not commit or push unless requested.
 - `agent-orchestration` - split goals into tasks, dispatch workers in worktrees, review and merge
 - `agent-communication` - handoff files, status signals, terminal messaging, ask-or-decide rules
 - `rex-terminal` - drive the Rex terminal from an agent (`rex run --wait`, send, capture, status, events)
+
+## Mobile and config skills
+- `mobile-app-development` - entry point for any mobile app request; always routes to the Flutter skills first
+- `env-and-secrets` - `.env.example` with safe samples, `.gitignore` rules, secrets handling; stack templates included

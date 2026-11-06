@@ -37,6 +37,14 @@ Before finishing:
 - For parallel agents, give each its own worktree and branch (`git-wt`, `crew`).
 - This is enforced: commits and (in Claude Code) edits on the default branch are blocked with a message. If you see "Blocked: you are on 'main'", run `git switch -c feat/<topic>` and continue. Do not bypass it with `ALLOW_DEFAULT_BRANCH` unless the user says to.
 
+## Mobile apps
+- For any mobile app request, use Flutter. Start with `mobile-app-development`, which routes to `senior-flutter-engineer`, `flutter-ui-ux-design`, `flutter-native-and-release` and `design-mobile-apps`.
+  Use another stack only when the project already uses it or the user names it.
+
+## Config and secrets
+- Never commit real secrets or `.env` files. Every project keeps a tracked `.env.example` with placeholder values and a `.gitignore` that ignores the real files.
+- When you add a config value, add it to `.env.example` in the same change, then run `env-check` (see `env-and-secrets`).
+
 ## Safety
 - Confirm before hard-to-reverse or outward-facing actions (push, deploy, delete, send).
 - Never auto-push, auto-merge, or enable yolo / skip-permission modes on your own.

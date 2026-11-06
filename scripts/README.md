@@ -35,6 +35,15 @@ ai-usage-bar --format tmux     # tmux colors
 ai-usage-bar --notify          # desktop notifications on changes
 ```
 
+## env-check - audit env files and .gitignore
+
+```bash
+env-check [dir]          # ignored and untracked? example present? secrets in the example? keys in sync?
+env-check [dir] --sync   # add missing keys from .env to .env.example with safe sample values
+```
+
+Exits 1 on any FAIL (tracked `.env`, not ignored, ignored example, real-looking secret in the example).
+
 ## guard-default-branch - keep agents off main
 
 Blocks commits and Claude Code edits on `main`, `master`, `develop`, `trunk` and a repo's default branch. Used by the global git `pre-commit` hook and a Claude Code `PreToolUse` hook.

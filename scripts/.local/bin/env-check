@@ -1,0 +1,88 @@
+#!/usr/bin/env bun
+// env-check - audit a project's env files and keep .env.example in sync.
+//
+//   env-check [dir]            Audit: env files ignored and untracked, .env.example present and not ignored,
+//                              keys in sync, no real-looking secrets in the example. Exit 1 on any FAIL.
+//   env-check [dir] --sync     Add keys that are in .env but missing from .env.example (safe sample values,
+//                              never real ones), creating .env.example if needed.
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+
+const argv = process.argv.slice(2);
+if (argv.includes("-h") || argv.includes("--help")) {
+  console.log(fs.readFileSync(import.meta.path, "utf8").split("\n").slice(1, 8).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
+  process.exit(0);
+}
+const sync = argv.includes("--sync");
+const dir = path.resolve(argv.find((a) => !a.startsWith("-")) ?? ".");
+
+const SECRET_KEY = /(KEY|SECRET|TOKEN|PASSWORD|PASSWD|PRIVATE|CREDENTIAL|AUTH|DSN)/i;
+const PLACEHOLDER = /^(|changeme|change-me|your[-_ ].*|<.*>|x{3,}|\*+|example.*|todo|replace.*|sample.*|dummy.*)$/i;
+const SAFE_VALUE = /^(true|false|\d+|[a-z]+|development|production|local)$/i;
+
+function git(...args: string[]) {
+  return spawnSync("git", ["-C", dir, ...args], { encoding: "utf8" });
+}
+const inRepo = git("rev-parse", "--show-toplevel").status === 0;
+
+export function parseKeys(text: string): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const line of text.split("\n")) {
+    const m = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    if (m) out.set(m[1], m[2].replace(/^["']|["']$/g, "").trim());
+  }
+  return out;
+}
+export const sampleFor = (key: string, value: string) =>
+  SECRET_KEY.test(key) || !SAFE_VALUE.test(value) ? `your-${key.toLowerCase().replace(/_/g, "-")}` : value;
+
+const isExample = (f: string) => /\.(example|sample|template)$|^env\.example\.json$/.test(f);
+const files = fs.readdirSync(dir).filter((f) => (f === ".env" || f.startsWith(".env.") || f.endsWith(".env") || f === "env.json") && !isExample(f));
+const examplePath = [".env.example", ".env.sample", ".env.template"].map((f) => path.join(dir, f)).find((f) => fs.existsSync(f)) ?? path.join(dir, ".env.example");
+const exampleExists = fs.existsSync(examplePath);
+const example = exampleExists ? parseKeys(fs.readFileSync(examplePath, "utf8")) : new Map<string, string>();
+
+if (sync) {
+  const real = parseKeys(fs.existsSync(path.join(dir, ".env")) ? fs.readFileSync(path.join(dir, ".env"), "utf8") : "");
+  const missing = [...real].filter(([k]) => !example.has(k));
+  if (!missing.length) { console.log("Nothing to add: .env.example already has every key from .env."); process.exit(0); }
+  const add = missing.map(([k, v]) => `${k}=${sampleFor(k, v)}`).join("\n");
+  const base = exampleExists ? fs.readFileSync(examplePath, "utf8").replace(/\n*$/, "\n") : "# Copy to .env and fill in real values. Never commit .env.\n";
+  fs.writeFileSync(examplePath, `${base}${exampleExists ? "\n# added by env-check --sync\n" : ""}${add}\n`);
+  console.log(`Added ${missing.length} key(s) to ${path.relative(process.cwd(), examplePath) || examplePath}: ${missing.map(([k]) => k).join(", ")}`);
+  process.exit(0);
+}
+
+let fails = 0, warns = 0;
+const fail = (m: string) => { fails++; console.log(`FAIL  ${m}`); };
+const warn = (m: string) => { warns++; console.log(`WARN  ${m}`); };
+const ok = (m: string) => console.log(`ok    ${m}`);
+
+if (!inRepo) warn("not a git repository: cannot check .gitignore or tracked files");
+for (const f of files) {
+  if (!inRepo) break;
+  if (git("ls-files", "--error-unmatch", f).status === 0) fail(`${f} is tracked by git. Run: git rm --cached ${f}  (and rotate any secret that was committed)`);
+  else if (git("check-ignore", "-q", f).status !== 0) fail(`${f} is not git-ignored. Add it to .gitignore`);
+  else ok(`${f} is ignored and untracked`);
+}
+if (!files.length) ok("no real env files in this folder");
+
+if (!exampleExists) {
+  if (files.length) warn("no .env.example. Create one: env-check --sync");
+} else {
+  const rel = path.basename(examplePath);
+  if (inRepo && git("check-ignore", "-q", rel).status === 0) fail(`${rel} is git-ignored but must be tracked. Add: !${rel}`);
+  else ok(`${rel} exists${inRepo ? " and is tracked-able" : ""}`);
+  for (const [k, v] of example) {
+    if (SECRET_KEY.test(k) && !PLACEHOLDER.test(v) && v.length > 12) fail(`${rel}: ${k} looks like a real secret. Use a placeholder such as your-${k.toLowerCase().replace(/_/g, "-")}`);
+  }
+  const real = parseKeys(fs.existsSync(path.join(dir, ".env")) ? fs.readFileSync(path.join(dir, ".env"), "utf8") : "");
+  const missingFromExample = [...real.keys()].filter((k) => !example.has(k));
+  const missingFromEnv = [...example.keys()].filter((k) => real.size && !real.has(k));
+  if (missingFromExample.length) warn(`.env has keys not in ${rel}: ${missingFromExample.join(", ")}  (env-check --sync)`);
+  if (missingFromEnv.length) warn(`${rel} has keys not in .env: ${missingFromEnv.join(", ")}`);
+  if (!missingFromExample.length && !missingFromEnv.length) ok("keys are in sync");
+}
+console.log(fails ? `\n${fails} problem(s)` : warns ? `\nOK with ${warns} warning(s)` : "\nAll good");
+process.exit(fails ? 1 : 0);

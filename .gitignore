@@ -5,8 +5,28 @@ zsh/.config/zsh/.zsh_history
 lazygit/.config/lazygit/state.yml
 nvim/.config/nvim/plugin/packer_compiled.lua
 
-# env
+# env files and secrets: ignore the real ones, keep the templates tracked
 .env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.env
+!*.env.example
+env.json
+!env.example.json
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.mobileprovision
+key.properties
+google-services.json
+GoogleService-Info.plist
+service-account*.json
 .aider*
 
 # Codex's live configuration contains machine-local trust and NUX state.

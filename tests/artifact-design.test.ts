@@ -15,6 +15,7 @@ const pack = [
   "flutter-native-and-release", "flutter-ui-ux-design", "poster-and-social-media-design",
   "svg-logo-and-icon-design", "web-motion-and-microinteractions", "print-and-publication-documents",
   "admin-panel-dashboard-design", "rex-terminal", "agent-orchestration", "agent-communication",
+  "mobile-app-development", "env-and-secrets",
   ...upstream.map((skill) => skill.name),
 ];
 
