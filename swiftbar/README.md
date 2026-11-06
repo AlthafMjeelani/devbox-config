@@ -33,9 +33,23 @@ Edit the numbers in `plugins/system-monitor.10s.ts` to taste. The parsing logic 
 
 ## AI usage
 
-The plugin runs `ai-usage --json` (from the `scripts` package) every 5 minutes.
-The menu bar shows the agent to use first and its remaining quota.
-The dropdown lists every agent with per-window usage bars and reset countdowns.
+Runs `ai-usage --json` (from the `scripts` package) every 5 minutes.
+
+**Menu bar**: shows what needs attention first, then the best agent to spend next, for example
+`▲ Cl 8% 5h ↻59m   ● Amp 90%   ● Cx 70% 7d ↻3d 11h   +4 ok`.
+At most 3 agents are shown; the rest collapse into `+N ok` (or `+N (2▲)` if some of the hidden ones need attention).
+`▲` means low or on pace to run out, `●` means healthy, `↻` is the time until the quota resets.
+
+**Dropdown**: agents sorted worst first. Each agent is one line (quota left, worst window, reset); hover it for every window, a usage bar and the burn-rate forecast (`at 23%/h you hit the limit in 20m`, plus the pace that is safe).
+
+**Logic**
+- **Use first** recommends the usable pool that resets soonest, but never one that is nearly exhausted (10% or less left) or blocked.
+- Status colors: green above 30% left, orange at 30% or less or when the current pace would hit the limit before reset, red at 10% or less.
+- **Notifications** fire only on changes: when an agent drops to critical, and when it is available again. The first run after install is silent.
+- **Stale fallback**: if `ai-usage` fails, the last good result is shown with a `⟳stale` marker instead of an empty bar.
+- Logins that are missing are listed under *Needs login* with a one-click fix.
+
+The logic lives in `lib/aiusage.ts` and is covered by `tests/aiusage.test.ts`.
 
 ## Install
 
