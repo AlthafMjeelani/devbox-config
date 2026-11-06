@@ -21,6 +21,17 @@ const cacheDir = path.join(os.homedir(), ".cache/ai-usage");
 const lastGood = path.join(cacheDir, "menubar-last.json");
 const stateFile = path.join(cacheDir, "menubar-state.json");
 
+// Optional colored icons: ~/.config/swiftbar/icons/<agent>.png (see agent-icons). Falls back to SF Symbols.
+const iconDir = path.join(os.homedir(), ".config/swiftbar/icons");
+const iconCache = new Map<string, string | null>();
+function iconB64(agent: string): string | null {
+  if (!iconCache.has(agent)) {
+    try { iconCache.set(agent, fs.readFileSync(path.join(iconDir, `${agent.toLowerCase()}.png`)).toString("base64")); } catch { iconCache.set(agent, null); }
+  }
+  return iconCache.get(agent)!;
+}
+const iconParams = (agent: string) => { const b = iconB64(agent); return b ? `image=${b}` : `sfimage=${symbolOf(agent)} sfcolor=${brand(agent)}`; };
+
 const clean = (text: string) => text.replace(/[|\n\r]/g, " ").trim();
 const readJson = <T>(file: string): T | null => { try { return JSON.parse(fs.readFileSync(file, "utf8")) as T; } catch { return null; } };
 const writeJson = (file: string, value: unknown) => { try { fs.mkdirSync(cacheDir, { recursive: true }); fs.writeFileSync(file, JSON.stringify(value)); } catch {} };
@@ -108,7 +119,7 @@ console.log(`AI USAGE  ·  ${live.length} connected${attentionCount ? `  ·  ${a
 if (staleSince) console.log(`⚠ Showing data from ${until(Date.now() + (Date.now() - staleSince))} ago (${failure}) | color=${ORANGE} size=11`);
 if (best) {
   const reset = best.nextResetAt ? `  ·  resets in ${until(best.nextResetAt)}` : "";
-  console.log(`Use first: ${best.agent}  ·  ${Math.round(best.left ?? 0)}% left${reset} | color=${brand(best.agent)} size=13 sfimage=${symbolOf(best.agent)} sfcolor=${brand(best.agent)}`);
+  console.log(`Use first: ${best.agent}  ·  ${Math.round(best.left ?? 0)}% left${reset} | color=${brand(best.agent)} size=13 ${iconParams(best.agent)}`);
 } else if (blockedAll) {
   console.log(`All limits reached | color=${RED} size=13 sfimage=exclamationmark.octagon.fill sfcolor=${RED}`);
 }
@@ -137,7 +148,7 @@ for (const pool of sortedPools) {
   const reset = w?.resetAt ? `↻${until(w.resetAt)}` : "";
   const pct = left === null ? "--" : `${Math.round(left)}%`;
   // Top line: severity icon, name, worst window. Details live in the submenu so the dropdown stays short.
-  console.log(`${poolName(pool).padEnd(18)} ${pct.padStart(4)} ${win.padEnd(2)} ${reset}${badge} | font=Menlo size=13 color=${sev === "ok" || !sev ? brand(pool.agent) : hex} sfimage=${symbolOf(pool.agent)} sfcolor=${brand(pool.agent)} trim=false`);
+  console.log(`${poolName(pool).padEnd(18)} ${pct.padStart(4)} ${win.padEnd(2)} ${reset}${badge} | font=Menlo size=13 color=${sev === "ok" || !sev ? brand(pool.agent) : hex} ${iconParams(pool.agent)} trim=false`);
   if (pool.account !== "default") console.log(`--${clean(pool.account)} | color=${GRAY} size=11`);
   const rows: Row[] = [...pool.rows].sort((a, b) => order(a.limit) - order(b.limit));
   for (const row of rows) {

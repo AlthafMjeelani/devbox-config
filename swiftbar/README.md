@@ -38,7 +38,7 @@ Runs `ai-usage --json` (from the `scripts` package) every 5 minutes.
 **Menu bar**: shows what needs attention first, then the best agent to spend next, for example
 `✺ Cl 8%▲ 5h ↻59m   ϟ Amp 90%   ⌘ Cx 70% 7d ↻3d 11h   +4 ok`.
 At most 3 agents are shown; the rest collapse into `+N ok` (or `+N (2▲)` if some of the hidden ones need attention).
-Each agent has its own icon (Codex ⌘, Claude ✺, Amp ϟ, Antigravity △, Kimi ☾, CommandCode ❯, OpenCode {}) in its identity color. The text after it takes the status color, with a `▲` when it is low or on pace to run out. `↻` is the time until the quota resets. In the dropdown each agent gets its own SF Symbol icon. The icons are generic shapes, not vendor logos.
+Each agent has its own icon (Codex ⌘, Claude ✺, Amp ϟ, Antigravity △, Kimi ☾, CommandCode ❯, OpenCode {}) in its identity color. The text after it takes the status color, with a `▲` when it is low or on pace to run out. `↻` is the time until the quota resets. In the dropdown each agent gets its own SF Symbol icon. The built-in icons are generic shapes. To use each agent's real colored icon in the dropdown, drop PNGs in `~/.config/swiftbar/icons/` or run `agent-icons set claude /Applications/Claude.app` (see `icons/README.md`). The menu bar title can only carry text, so it keeps the colored glyphs.
 
 **Dropdown**: agents sorted worst first. Each agent is one line (quota left, worst window, reset); hover it for every window, a usage bar and the burn-rate forecast (`at 23%/h you hit the limit in 20m`, plus the pace that is safe).
 
