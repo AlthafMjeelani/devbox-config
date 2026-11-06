@@ -3,6 +3,16 @@ set -euo pipefail
 
 input=$(cat)
 
+# Snapshot the subscription rate limits so `ai-usage` can show Claude quota without polling the API.
+snapshot_dir="$HOME/.cache/ai-usage"
+if mkdir -p "$snapshot_dir" 2>/dev/null; then
+  jq -c --argjson now "$(date +%s)000" 'select(.rate_limits != null) | {savedAt: $now, rate_limits: .rate_limits}' <<<"$input" \
+    > "$snapshot_dir/claude-statusline.json.tmp" 2>/dev/null \
+    && [ -s "$snapshot_dir/claude-statusline.json.tmp" ] \
+    && mv "$snapshot_dir/claude-statusline.json.tmp" "$snapshot_dir/claude-statusline.json" \
+    || rm -f "$snapshot_dir/claude-statusline.json.tmp"
+fi
+
 model=$(jq -r '.model.display_name // .model.name // .model // "model"' <<<"$input" 2>/dev/null || printf 'model')
 cwd=$(jq -r '.workspace.current_dir // .cwd // env.PWD' <<<"$input" 2>/dev/null || pwd)
 base=$(basename "$cwd")

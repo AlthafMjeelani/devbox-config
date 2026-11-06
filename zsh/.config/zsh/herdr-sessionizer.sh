@@ -6,6 +6,15 @@
 # open workspaces and running agents are jump targets, projects open as
 # new workspaces, GitHub search is behind an explicit ctrl-g.
 
+# Needs bash 4+ (associative arrays, mapfile); macOS ships 3.2.
+if ((BASH_VERSINFO[0] < 4)); then
+    for newer_bash in /opt/homebrew/bin/bash /usr/local/bin/bash; do
+        [[ -x "$newer_bash" ]] && exec "$newer_bash" "$0" "$@"
+    done
+    echo "herdr-sessionizer: bash 4+ required (brew install bash)" >&2
+    exit 1
+fi
+
 set -euo pipefail
 shopt -s nullglob
 

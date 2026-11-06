@@ -204,7 +204,53 @@ async function codexRows(): Promise<Row[]> {
   return results.flat();
 }
 
+// On macOS, Claude Code keeps its OAuth login in the login keychain, not in a file.
+function claudeKeychainAuth(): any | null {
+  if (process.platform !== "darwin") return null;
+  try {
+    const raw = execFileSync("security", ["find-generic-password", "-s", "Claude Code-credentials", "-w"], { encoding: "utf8", timeout: 5_000, stdio: ["ignore", "pipe", "ignore"] });
+    return JSON.parse(raw.trim())?.claudeAiOauth ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// The Claude usage endpoint rate-limits (HTTP 429) when polled often, so cache successful reads.
+const claudeCache = path.join(home, ".cache/ai-usage/claude.json");
+
+// Claude Code passes subscription rate limits to its status line, which snapshots them here.
+function claudeFromStatusline(): Row[] | null {
+  const snapshot = readJson(path.join(home, ".cache/ai-usage/claude-statusline.json"));
+  const limits = snapshot?.rate_limits;
+  if (!limits || Date.now() - Number(snapshot.savedAt) > 6 * 3_600_000) return null;
+  const rows: Row[] = [];
+  for (const [label, key] of [["5h", "five_hour"], ["7d", "seven_day"]] as const) {
+    const value = limits[key];
+    if (!value || typeof value.used_percentage !== "number") continue;
+    const resetAt = epoch(value.resets_at);
+    if (resetAt && resetAt < Date.now()) continue;
+    rows.push({ agent: "Claude", account: activeAccount("claude") ?? "default", pool: "default", limit: label, used: percent(value.used_percentage), resetAt, note: "from Claude session" });
+  }
+  return rows.length ? rows : null;
+}
+
 async function claudeRows(): Promise<Row[]> {
+  const cached = readJson(claudeCache);
+  const age = cached ? Date.now() - Number(cached.savedAt) : Infinity;
+  if (age < 120_000 && Array.isArray(cached.rows)) return cached.rows;
+  const rows = await claudeLive();
+  if (rows.some((row) => row.used !== null)) {
+    try {
+      fs.mkdirSync(path.dirname(claudeCache), { recursive: true });
+      writeJson(claudeCache, { savedAt: Date.now(), rows });
+    } catch {}
+    return rows;
+  }
+  if (age < 3_600_000 && Array.isArray(cached.rows)) return cached.rows;
+  return claudeFromStatusline() ?? rows;
+}
+
+async function claudeLive(): Promise<Row[]> {
   const profilesDir = path.join(home, ".local/share/ai-accounts/claude");
   const live = path.join(home, ".claude/.credentials.json");
   const active = activeAccount("claude");
@@ -216,7 +262,7 @@ async function claudeRows(): Promise<Row[]> {
     const file = profileName === active && fs.existsSync(live) ? live : path.join(profilesDir, name);
     return { name: profileName, auth: readJson(file)?.claudeAiOauth };
   });
-  if (!profiles.length) profiles.push({ name: active ?? "default", auth: readJson(live)?.claudeAiOauth });
+  if (!profiles.length) profiles.push({ name: active ?? "default", auth: readJson(live)?.claudeAiOauth ?? claudeKeychainAuth() });
 
   const results = await Promise.all(profiles.map(async ({ name, auth }) => {
     if (!auth?.accessToken) return [{ agent: "Claude", account: name, pool: "default", limit: "-", used: null, resetAt: null, note: "not logged in" }];
@@ -242,14 +288,14 @@ async function claudeRows(): Promise<Row[]> {
         note: auth.subscriptionType,
       }));
     } catch (error) {
-      return [{ agent: "Claude", account: name, pool: "default", limit: "-", used: null, resetAt: null, note: `${(error as Error).message}; run claude /login` }];
+      return [{ agent: "Claude", account: name, pool: "default", limit: "-", used: null, resetAt: null, note: /429/.test((error as Error).message) ? "rate limited, retry in a few minutes" : `${(error as Error).message}; run claude /login` }];
     }
   }));
   return results.flat();
 }
 
 async function kimiRows(): Promise<Row[]> {
-  const file = path.join(home, ".kimi-code/credentials/kimi-code.json");
+  const file = [".kimi-code", ".kimi"].map((dir) => path.join(home, dir, "credentials/kimi-code.json")).find((candidate) => fs.existsSync(candidate)) ?? path.join(home, ".kimi-code/credentials/kimi-code.json");
   let auth = readJson(file);
   if (!auth?.access_token) return [{ agent: "Kimi", account: "default", pool: "default", limit: "-", used: null, resetAt: null, note: "not logged in" }];
   try {
@@ -364,25 +410,47 @@ async function ampRows(): Promise<Row[]> {
 }
 
 function agyPorts(): number[] {
+  const parse = (output: string, pattern: RegExp) => [...new Set([...output.matchAll(pattern)].map((match) => Number(match[1])))];
   try {
+    if (process.platform === "darwin") {
+      const output = execFileSync("lsof", ["-nP", "-iTCP", "-sTCP:LISTEN"], { encoding: "utf8", timeout: 3_000, stdio: ["ignore", "pipe", "ignore"] });
+      return parse(output.split("\n").filter((line) => /^(agy|language_server)/.test(line)).join("\n"), /127\.0\.0\.1:(\d+)/g);
+    }
     const output = execFileSync("ss", ["-ltnp"], { encoding: "utf8", timeout: 2_000 });
-    const ports = [...output.matchAll(/127\.0\.0\.1:(\d+).*users:\(\(\"agy\"/g)].map((match) => Number(match[1]));
-    return [...new Set(ports)];
+    return parse(output, /127\.0\.0\.1:(\d+).*users:\(\("agy"/g);
   } catch {
     return [];
   }
 }
 
-async function antigravityRows(): Promise<Row[]> {
+const agyCache = path.join(home, ".cache/ai-usage/antigravity.json");
+
+function agyOffline(running: boolean): Row[] {
+  const cached = readJson(agyCache);
+  if (Array.isArray(cached?.rows) && cached.rows.length) {
+    const ago = Math.max(1, Math.round((Date.now() - Number(cached.savedAt)) / 60_000));
+    const age = ago >= 120 ? `${Math.round(ago / 60)}h` : `${ago}m`;
+    return cached.rows.map((row: Row) => ({ ...row, note: `cached ${age} ago` }));
+  }
+  // Newer agy builds protect the local quota API with a per-session CSRF token that is not exposed, so only the login state is known.
+  const note = running ? "agy running; quota API is locked (CSRF), see /usage inside agy" : "not running; open agy for live quota";
+  return [{ agent: "Antigravity", account: "default", pool: "default", limit: "models", used: null, resetAt: null, note }];
+}
+
+async function antigravityLive(): Promise<Row[]> {
   const body = JSON.stringify({ metadata: { ideName: "antigravity", extensionName: "antigravity", locale: "en" } });
   let data: any = null;
   let quotaSummary: any = null;
-  for (const port of agyPorts()) {
+  // Inside an agy hook or tool shell, agy exports the local server address and its per-session CSRF token.
+  const csrf = process.env.ANTIGRAVITY_CSRF_TOKEN;
+  const envPort = Number(process.env.ANTIGRAVITY_LS_ADDRESS?.split(":").pop());
+  const authHeaders: Record<string, string> = csrf ? { "x-codeium-csrf-token": csrf } : {};
+  for (const port of [...new Set([...(envPort ? [envPort] : []), ...agyPorts()])]) {
     for (const scheme of ["http", "https"]) {
       try {
         const response = await fetch(`${scheme}://127.0.0.1:${port}/exa.language_server_pb.LanguageServerService/GetUserStatus`, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "Connect-Protocol-Version": "1" },
+          headers: { "Content-Type": "application/json", "Connect-Protocol-Version": "1", ...authHeaders },
           body,
           signal: AbortSignal.timeout(1_500),
           ...(scheme === "https" ? { tls: { rejectUnauthorized: false } } as any : {}),
@@ -391,7 +459,7 @@ async function antigravityRows(): Promise<Row[]> {
           data = await response.json();
           const quotaResponse = await fetch(`${scheme}://127.0.0.1:${port}/exa.language_server_pb.LanguageServerService/RetrieveUserQuotaSummary`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Connect-Protocol-Version": "1" },
+            headers: { "Content-Type": "application/json", "Connect-Protocol-Version": "1", ...authHeaders },
             body: JSON.stringify({ forceRefresh: true }),
             signal: AbortSignal.timeout(5_000),
             ...(scheme === "https" ? { tls: { rejectUnauthorized: false } } as any : {}),
@@ -403,7 +471,7 @@ async function antigravityRows(): Promise<Row[]> {
     }
     if (data) break;
   }
-  if (!data) return [{ agent: "Antigravity", account: "default", pool: "default", limit: "models", used: null, resetAt: null, note: "open agy, then rerun" }];
+  if (!data) return agyOffline(agyPorts().length > 0);
 
   const status = data.userStatus ?? {};
   const groups = quotaSummary?.response?.groups ?? [];
@@ -454,6 +522,42 @@ async function antigravityRows(): Promise<Row[]> {
       note: status.planStatus?.planInfo?.planName,
     };
   });
+}
+
+// `agy -p "/usage"` prints the quota for the logged-in account without a model call, whether or not agy is running.
+function antigravityFromCli(): Row[] | null {
+  try {
+    const output = execFileSync("agy", ["-p", "/usage", "--print-timeout", "30s"], { encoding: "utf8", timeout: 35_000, cwd: os.tmpdir(), stdio: ["ignore", "pipe", "ignore"] });
+    const rows: Row[] = [];
+    for (const line of output.split("\n")) {
+      const match = line.match(/^(.+?)\t(Weekly|Five Hour) Limit Remaining\t(\d+(?:\.\d+)?)%\t(\S+)/);
+      if (!match) continue;
+      rows.push({
+        agent: "Antigravity",
+        account: "default",
+        pool: match[1]!.replace(/ models$/i, "").replace(/ and /gi, " + "),
+        limit: match[2] === "Weekly" ? "7d" : "5h",
+        used: percent(100 - Number(match[3])),
+        resetAt: epoch(match[4]),
+      });
+    }
+    return rows.length ? rows : null;
+  } catch {
+    return null;
+  }
+}
+
+async function antigravityRows(): Promise<Row[]> {
+  const cached = readJson(agyCache);
+  if (Array.isArray(cached?.rows) && Date.now() - Number(cached.savedAt) < 300_000 && cached.rows.some((row: Row) => row.used !== null)) return cached.rows;
+  const rows = antigravityFromCli() ?? await antigravityLive();
+  if (rows.some((row) => row.used !== null)) {
+    try {
+      fs.mkdirSync(path.dirname(agyCache), { recursive: true });
+      writeJson(agyCache, { savedAt: Date.now(), rows });
+    } catch {}
+  }
+  return rows;
 }
 
 const colors = !("NO_COLOR" in process.env)
