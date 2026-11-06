@@ -429,17 +429,27 @@ describe("Crew Antigravity execution", () => {
     expect(callCrewFunction("resolve_profile deep antigravity")).toBe("gemini-3.1-pro-high");
   });
 
+  // Hermetic: a fake `agy` on PATH so the result does not depend on what is installed on the machine.
+  const withAgy = (body: string) =>
+    callCrewFunction(`fake=$(mktemp -d); printf '#!/bin/sh\\n' > "$fake/agy"; chmod +x "$fake/agy"; PATH="$fake:$PATH"; ${body}; rm -rf "$fake"`);
+  const withoutAgy = (body: string) => callCrewFunction(`PATH="/usr/bin:/bin"; ${body}`);
+
   test("launches headless Antigravity bounded by CREW_MANAGED + --dangerously-skip-permissions", () => {
-    const command = callCrewFunction("antigravity_headless_command gemini-3.6-flash-high 'finish task'");
+    const command = withAgy("antigravity_headless_command gemini-3.6-flash-high 'finish task'");
     expect(command).toContain("CREW_MANAGED=1 agy -p");
     expect(command).toContain("--model gemini-3.6-flash-high");
     expect(command).toContain("--dangerously-skip-permissions");
   });
 
   test("launches interactive Antigravity without print or permission flags", () => {
-    const command = callCrewFunction("antigravity_interactive_command gemini-3.6-flash-high");
+    const command = withAgy("antigravity_interactive_command gemini-3.6-flash-high");
     expect(command).toBe("agy --model gemini-3.6-flash-high");
     expect(command).not.toContain("-p");
     expect(command).not.toContain("--dangerously-skip-permissions");
+  });
+
+  test("falls back to the antigravity binary when agy is not installed", () => {
+    expect(withoutAgy("antigravity_interactive_command gemini-3.6-flash-high")).toBe("antigravity --model gemini-3.6-flash-high");
+    expect(withoutAgy("antigravity_headless_command m 'x'")).toContain("CREW_MANAGED=1 antigravity -p");
   });
 });

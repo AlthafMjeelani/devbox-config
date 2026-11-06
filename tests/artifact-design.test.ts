@@ -52,7 +52,8 @@ describe("professional artifact design pack", () => {
     }
   });
 
-  test("Stow and agent sync expose all pack skills through all seven hosts", () => {
+  // Needs GNU Stow on PATH; skipped (not failed) on machines without it.
+  test.skipIf(!Bun.which("stow"))("Stow and agent sync expose all pack skills through all seven hosts", () => {
     const target = realpathSync(mkdtempSync(resolve(tmpdir(), "artifact-design-install-")));
     try {
       const stow = Bun.spawnSync(["stow", "-d", repo, "-t", target, "agents"], { stdout: "pipe", stderr: "pipe" });

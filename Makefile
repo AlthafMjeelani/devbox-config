@@ -33,10 +33,11 @@ DEFAULT_PACKAGES := agents alacritty amp antigravity commandcode git herdr kitty
 #   make stow PKG="opencode nvim tmux"
 PKG ?= $(DEFAULT_PACKAGES)
 
-.PHONY: help list stow restow unstow agents-sync amp-global-sync verify-agent-workflow
+.PHONY: help list setup stow restow unstow agents-sync amp-global-sync verify-agent-workflow
 
 help:
 	@echo "Targets:"
+	@echo "  make setup                     One-command install (prereqs, backups, skills, stow, menu bar)"
 	@echo "  make list                      List available packages"
 	@echo "  make stow   [PKG=\"a b c\"]       Install default packages, or only PKG"
 	@echo "  make restow [PKG=\"a b c\"]       Refresh default packages, or only PKG"
@@ -55,6 +56,9 @@ help:
 	@echo "Variables:"
 	@echo "  TARGET=$(TARGET)  (install destination)"
 	@echo "  PKG=\"$(PKG)\""
+
+setup:
+	./setup.sh
 
 list:
 	@echo "Default packages (TARGET=$(TARGET)):"

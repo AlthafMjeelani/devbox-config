@@ -68,65 +68,44 @@ Agents pick skills by their description. You can also name one: "use the flutter
 2. Run `make agents-sync && make restow`.
 3. Run `make verify-agent-workflow`, then commit and push.
 
-## Connect this repo to your local machine
-
-### 1. Prerequisites
-
-| Tool | macOS | Arch / Linux |
-|---|---|---|
-| git, GNU Stow, make | `brew install git stow make` | `sudo pacman -S git stow make` (Debian/Ubuntu: `sudo apt install git stow make`) |
-| Bun (runs `agents-sync`) | `brew install oven-sh/bun/bun` | `curl -fsSL https://bun.sh/install \| bash` |
-| Agents you use | e.g. Claude Code, Codex, OpenCode | same |
-
-### 2. Clone
+## Quick start (one command)
 
 ```sh
 git clone git@github.com:AlthafMjeelani/devbox-config.git ~/devbox-config
 cd ~/devbox-config
-make list          # shows the available packages
+./setup.sh
 ```
 
-### 3. Back up files that would conflict
+`setup.sh` is safe to re-run and does everything:
 
-Stow refuses to overwrite real files. Move existing ones aside first:
+1. Installs prerequisites (git, stow, make, jq, bun) with Homebrew, pacman or apt.
+2. Moves any file that would block Stow into `~/.devbox-config-backup/<timestamp>/` (nothing is deleted).
+3. Syncs the shared skills and subagents to all seven agents and links every package.
+4. Creates `~/.codex/config.toml` from the template if you have none.
+5. On macOS, installs SwiftBar and points it at the two menu bar plugins (system monitor and AI usage).
+6. Verifies the result and prints what is left to do.
+
+Options: `--dry-run` (show only), `--shell` (also stow zsh, zshenv, zprofile), `--packages "agents nvim"` (only these), `--no-install`, `--no-swiftbar`, `-y` (no prompt). Run `./setup.sh --help` for the list.
+
+Prefer to see first? `./setup.sh --dry-run`.
+
+After it finishes, restart your terminal and your agents, then ask one: "list your skills".
+Update later with `git pull && ./setup.sh -y`.
+
+### Manual steps (what the script automates)
 
 ```sh
-mv ~/.claude/CLAUDE.md ~/.claude/CLAUDE.md.bak 2>/dev/null
-mv ~/.claude/settings.json ~/.claude/settings.json.bak 2>/dev/null
-rmdir ~/.claude/skills 2>/dev/null
+brew install git stow make jq oven-sh/bun/bun      # or pacman / apt
 mkdir -p ~/.agents/skills
-# plus ~/.gitconfig, ~/.tmux.conf, ~/.zshrc if you plan to stow those packages
-```
-
-### 4. Install
-
-```sh
 make agents-sync && make stow
-```
-
-This links the default packages: `agents alacritty amp antigravity commandcode git herdr kitty nvim opencode scripts swiftbar tmux`.
-
-### 5. Optional: shell packages
-
-`zsh`, `zshenv`, `zprofile` move `ZDOTDIR` and replace `~/.zshrc`, so they are not in the default set:
-
-```sh
-make stow PKG="zsh zshenv zprofile"
-```
-
-Add `export PATH="$HOME/.local/bin:$PATH"` if the `scripts/` tools are not found.
-Flutter/Dart users: `.exports` already adds `fvm` and `.pub-cache` to `PATH`.
-
-### 6. Verify it works
-
-```sh
+make stow PKG="zsh zshenv zprofile"                  # optional shell setup
+brew install --cask swiftbar                         # macOS menu bar
+defaults write com.ameba.SwiftBar PluginDirectory -string ~/.config/swiftbar/plugins
 make verify-agent-workflow
-readlink -f ~/.claude/skills        # -> .../agents/.config/opencode/skills
-ls ~/.claude/skills | grep admin-panel-dashboard-design
-agents-sync --check
 ```
 
-Then open any agent and ask: "list your skills". The new ones should appear.
+If Stow reports "existing target is not owned by stow", move that file aside and run again.
+Flutter/Dart users: `.exports` already adds `fvm` and `.pub-cache` to `PATH`.
 
 ### Pick only some parts
 
@@ -140,7 +119,7 @@ make TARGET=/tmp/test stow             # dry run into a temp directory
 
 | I want to | Run |
 |---|---|
-| Pull new config on a machine | `git pull && make agents-sync && make restow` |
+| Pull new config on a machine | `git pull && ./setup.sh -y` |
 | Change a config | Edit the file in `$HOME` (it is a symlink), then `git commit` in `~/devbox-config` |
 | Add a skill | Create the skill folder (see above), `make agents-sync && make restow` |
 | Check everything is healthy | `make verify-agent-workflow` |
@@ -148,9 +127,9 @@ make TARGET=/tmp/test stow             # dry run into a temp directory
 
 ## Troubleshooting
 
-- **"existing target is not owned by stow"**: a real file is in the way. Move it aside (step 3) and rerun.
+- **"existing target is not owned by stow"**: a real file is in the way. `./setup.sh` backs it up for you; or move it aside and rerun.
 - **New skill not showing in an agent**: run `make agents-sync && make restow`, then restart the agent.
-- **`stow` or `bun` not found**: install the prerequisites in step 1.
+- **`stow` or `bun` not found**: run `./setup.sh` (installs them) or install them yourself.
 - **`agents-sync` can't find the repo**: run it from inside `~/devbox-config`.
 
 ## Notes
