@@ -1,35 +1,59 @@
 # devbox-config
 
-My dev machine setup as code: shell, terminal, editor, git and **AI coding agents**
-(Claude Code, Codex, OpenCode, Kimi Code, Amp, CommandCode, Antigravity), all managed with
-[GNU Stow](https://www.gnu.org/software/stow/).
+My dev machine as code: shell, terminal, editor, git, a macOS menu bar, and **one shared setup for seven AI coding agents** (Claude Code, Codex, OpenCode, Kimi Code, Amp, CommandCode, Antigravity). Managed with [GNU Stow](https://www.gnu.org/software/stow/): files in `$HOME` are symlinks into this repo, so editing a config edits the repo and `git diff` shows what changed.
 
-Clone it once, run two commands, and every tool picks up the same config and the same skills.
-Files in `$HOME` become symlinks into this repo, so editing a config edits the repo file and
-`git diff` shows exactly what you changed.
+## Quick start
+
+```sh
+git clone git@github.com:AlthafMjeelani/devbox-config.git ~/devbox-config
+cd ~/devbox-config
+./setup.sh
+```
+
+Then restart your terminal and your agents, and ask one of them: "list your skills".
+
+`setup.sh` is safe to re-run. It installs prerequisites, backs up any file that would block Stow (into `~/.devbox-config-backup/`, nothing is deleted), assigns the shared skills to all seven agents, links every package, and on macOS installs SwiftBar with the menu bar plugins. Want to preview first? `./setup.sh --dry-run`.
+
+## Everyday commands
+
+| I want to | Run |
+|---|---|
+| Update this machine | `git pull && ./setup.sh -y` |
+| Check everything is healthy | `make verify-agent-workflow` |
+| Add or change a skill | edit `agents/.config/opencode/skills/<name>/SKILL.md`, then `make agents-sync && make restow` |
+| Install only some parts | `make stow PKG="agents opencode nvim"` |
+| Remove a part | `make unstow PKG="nvim"` |
+| Also set up the zsh config | `./setup.sh --shell` |
+| See usage and quota for every agent | `ai-usage` (or the menu bar) |
+| Edit a config | change the file in `$HOME` (it is a symlink), then `git commit` here |
+
+## What you get
+
+**One skill set for every agent.** All 117 skills live in `agents/.config/opencode/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
+
+**A macOS menu bar** (SwiftBar) with two plugins:
+
+- *System monitor*: CPU, RAM, disk, battery and network at a glance, turning orange or red only when something needs attention.
+- *AI usage*: quota left, reset timers and a burn-rate forecast per agent, with alerts and per-agent icons. Details in [`swiftbar/README.md`](swiftbar/README.md).
+
+**Dev tools in `~/.local/bin`**: `ai-usage`, `agents-sync`, `crew` (multi-agent tmux orchestrator), `gate` (local ship gate), `git-wt` (worktrees), `ai-account`, `agent-icons` and more. See [`scripts/README.md`](scripts/README.md).
 
 ## What is inside
 
 | Folder | What it configures |
 |---|---|
-| `agents/` | Shared agent brain: `AGENTS.md`, subagents, models, and **100+ shared skills** in `agents/.config/opencode/skills/` |
+| `agents/` | Shared agent brain: `AGENTS.md`, subagents, models, and the shared skills |
 | `opencode/`, `amp/`, `antigravity/`, `commandcode/`, `herdr/` | Per-agent settings, plugins and commands |
 | `nvim/` | Neovim (LazyVim) with AI plugins and LSPs |
 | `tmux/`, `tmux-resurrect/` | tmux, session restore and agent status bar |
 | `zsh/`, `zshenv/`, `zprofile/`, `starship/` | Shell, aliases, PATH exports, prompt, sessionizers |
 | `alacritty/`, `ghostty/`, `kitty/`, `wezterm/` | Terminal emulators |
 | `git/`, `lazygit/`, `.vscode/` | Git config, Lazygit (`Ctrl+a` runs an AI commit), VS Code settings |
-| `swiftbar/` | macOS menu bar: system monitor (CPU, RAM, disk, battery, network) and AI quota/reset timers |
-| `scripts/` | CLI tools in `~/.local/bin` (`ai-usage`, `agents-sync`, `crew`, `gate`, `git-wt`, ...) |
+| `swiftbar/` | macOS menu bar plugins |
+| `scripts/` | CLI tools |
 | `docs/`, `tests/` | Docs and workflow tests |
 
-## How the skills work
-
-All agents read skills from one place: `agents/.config/opencode/skills/`.
-`make agents-sync` and `make stow` link that folder into each agent's own skills directory, so a
-skill added there is available to **all seven agents**. No per-agent copies.
-
-Skills added for full-stack and design work:
+## Skills added for full-stack and design work
 
 | Skill | Use it for |
 |---|---|
@@ -47,18 +71,9 @@ Skills added for full-stack and design work:
 
 Full catalog: [`docs/DESIGN-SKILLS.md`](docs/DESIGN-SKILLS.md).
 
-### How to use a skill
+### Add your own skill
 
-Just ask your agent for the task in plain words, for example:
-
-- "Design an admin dashboard for orders with a sidebar, data table and KPI cards" (uses `admin-panel-dashboard-design`)
-- "Add JWT refresh rotation to this API" (uses `auth-and-identity`)
-
-Agents pick skills by their description. You can also name one: "use the flutter-ui-ux-design skill".
-
-### How to add your own skill
-
-1. Create `agents/.config/opencode/skills/<name>/SKILL.md` with frontmatter:
+1. Create `agents/.config/opencode/skills/<name>/SKILL.md`:
    ```md
    ---
    name: <name>          # must equal the folder name
@@ -68,31 +83,22 @@ Agents pick skills by their description. You can also name one: "use the flutter
 2. Run `make agents-sync && make restow`.
 3. Run `make verify-agent-workflow`, then commit and push.
 
-## Quick start (one command)
+## Setup details
 
-```sh
-git clone git@github.com:AlthafMjeelani/devbox-config.git ~/devbox-config
-cd ~/devbox-config
-./setup.sh
-```
+### Options
 
-`setup.sh` is safe to re-run and does everything:
+`./setup.sh --help` lists them all:
 
-1. Installs prerequisites (git, stow, make, jq, bun) with Homebrew, pacman or apt.
-2. Moves any file that would block Stow into `~/.devbox-config-backup/<timestamp>/` (nothing is deleted).
-3. Syncs the shared skills and subagents to all seven agents and links every package.
-4. Creates `~/.codex/config.toml` from the template if you have none.
-5. On macOS, installs SwiftBar and points it at the two menu bar plugins (system monitor and AI usage).
-6. Verifies the result and prints what is left to do.
+| Option | Effect |
+|---|---|
+| `--dry-run` | show what would happen, change nothing |
+| `--shell` | also stow `zsh`, `zshenv`, `zprofile` (they replace `~/.zshrc`) |
+| `--packages "a b"` | stow only these packages |
+| `--no-install` | skip installing prerequisites |
+| `--no-swiftbar` | skip the macOS menu bar step |
+| `-y` | no confirmation prompt |
 
-Options: `--dry-run` (show only), `--shell` (also stow zsh, zshenv, zprofile), `--packages "agents nvim"` (only these), `--no-install`, `--no-swiftbar`, `-y` (no prompt). Run `./setup.sh --help` for the list.
-
-Prefer to see first? `./setup.sh --dry-run`.
-
-After it finishes, restart your terminal and your agents, then ask one: "list your skills".
-Update later with `git pull && ./setup.sh -y`.
-
-### Manual steps (what the script automates)
+### What the script automates
 
 ```sh
 brew install git stow make jq oven-sh/bun/bun      # or pacman / apt
@@ -104,39 +110,29 @@ defaults write com.ameba.SwiftBar PluginDirectory -string ~/.config/swiftbar/plu
 make verify-agent-workflow
 ```
 
-If Stow reports "existing target is not owned by stow", move that file aside and run again.
-Flutter/Dart users: `.exports` already adds `fvm` and `.pub-cache` to `PATH`.
+### Menu bar notes
 
-### Pick only some parts
+- Plugins expect Bun at `/opt/homebrew/bin/bun`. On an Intel Mac, either symlink it there or change the first line of the plugins to `/usr/local/bin/bun`. `setup.sh` prints the exact command if it is needed.
+- Colored agent icons are optional: `agent-icons set claude /Applications/Claude.app`. See [`swiftbar/.config/swiftbar/icons/README.md`](swiftbar/.config/swiftbar/icons/README.md).
 
-```sh
-make stow PKG="agents opencode nvim"   # only these packages
-make unstow PKG="nvim"                 # remove one package's symlinks
-make TARGET=/tmp/test stow             # dry run into a temp directory
-```
+### Good to know
 
-## Daily use
-
-| I want to | Run |
-|---|---|
-| Pull new config on a machine | `git pull && ./setup.sh -y` |
-| Change a config | Edit the file in `$HOME` (it is a symlink), then `git commit` in `~/devbox-config` |
-| Add a skill | Create the skill folder (see above), `make agents-sync && make restow` |
-| Check everything is healthy | `make verify-agent-workflow` |
-| Sync skills to Amp personal repos | `make amp-global-sync` |
+- Flutter/Dart: `.exports` already adds `fvm` and `.pub-cache` to `PATH`.
+- Codex's `~/.codex/config.toml` is machine-local and not symlinked. `setup.sh` creates it from `agents/codex-config.toml.example` only if you have none.
+- Removed on purpose: `atac`, `btop`, `cava`, `cups`, `fastfetch`, `htop`, `neofetch` and the app-update scripts, since they are not part of the agent workflow.
 
 ## Troubleshooting
 
-- **"existing target is not owned by stow"**: a real file is in the way. `./setup.sh` backs it up for you; or move it aside and rerun.
-- **New skill not showing in an agent**: run `make agents-sync && make restow`, then restart the agent.
-- **`stow` or `bun` not found**: run `./setup.sh` (installs them) or install them yourself.
-- **`agents-sync` can't find the repo**: run it from inside `~/devbox-config`.
+| Problem | Fix |
+|---|---|
+| "existing target is not owned by stow" | A real file is in the way. `./setup.sh` backs it up for you; or move it aside and rerun. |
+| New skill not showing in an agent | `make agents-sync && make restow`, then restart the agent. |
+| `stow` or `bun` not found | Run `./setup.sh`, or install them yourself. |
+| `agents-sync` can't find the repo | Run it from inside `~/devbox-config`. |
+| Menu bar plugin shows nothing | Check SwiftBar's plugin folder is `~/.config/swiftbar/plugins` and Bun is installed. |
+| `command not found: ai-usage` | Add `export PATH="$HOME/.local/bin:$PATH"` to your shell profile. |
 
-## Notes
-
-- Codex's `~/.codex/config.toml` is machine-local and not symlinked. See `agents/README.md` for the template.
-- Removed on purpose: `atac`, `btop`, `cava`, `cups`, `fastfetch`, `htop`, `neofetch` and the app-update scripts, since they are not part of the agent workflow.
-- More detail on the agent setup: [`agents/README.md`](agents/README.md) and [`scripts/README.md`](scripts/README.md).
+More detail: [`agents/README.md`](agents/README.md) (agent setup) and [`scripts/README.md`](scripts/README.md) (CLI tools).
 
 ## Credits
 
