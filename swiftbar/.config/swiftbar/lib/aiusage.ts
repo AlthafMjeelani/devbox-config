@@ -156,3 +156,15 @@ export function pickBest(pools: Pool[], now = Date.now()): Pool | undefined {
   if (healthy.length) return [...healthy].sort(soonest)[0];
   return [...usable].sort((a, b) => (b.left ?? -1) - (a.left ?? -1))[0];
 }
+
+// Per-agent icons: a text glyph for the menu bar title (which can only carry text) and an SF Symbol for the
+// dropdown. Generic shapes only, so every agent is recognizable at a glance without copying anyone's logo.
+export const AGENT_GLYPH: Record<string, string> = {
+  Codex: "⌘", Claude: "✺", Amp: "ϟ", Antigravity: "△", Kimi: "☾", CommandCode: "❯", OpenCode: "{}",
+};
+export const AGENT_SYMBOL: Record<string, string> = {
+  Codex: "chevron.left.forwardslash.chevron.right", Claude: "sparkle", Amp: "bolt.fill", Antigravity: "arrow.up.forward.circle.fill",
+  Kimi: "moon.stars.fill", CommandCode: "terminal.fill", OpenCode: "curlybraces",
+};
+export const glyphOf = (agent: string): string => AGENT_GLYPH[agent] ?? "◆";
+export const symbolOf = (agent: string): string => AGENT_SYMBOL[agent] ?? "circle.fill";

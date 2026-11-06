@@ -11,7 +11,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
-  GRAY, ORANGE, RED, SEV_COLOR, breaches, connected, diffAlerts, forecast, hasQuota, leftOf, pickBest, poolSeverities, poolSeverity,
+  GRAY, ORANGE, RED, SEV_COLOR, glyphOf, symbolOf, breaches, connected, diffAlerts, forecast, hasQuota, leftOf, pickBest, poolSeverities, poolSeverity,
   selectMenubar, summarizeAgents, until, worstRow, type Pool, type Row, type Sev,
 } from "../lib/aiusage.ts";
 
@@ -86,12 +86,14 @@ const summaries = summarizeAgents(pools);
 const { shown, hidden, hiddenAttention } = selectMenubar(summaries, best?.agent, 3);
 const segments = shown.map((s) => {
   const name = SHORT[s.agent] ?? s.agent.slice(0, 3);
-  if (!s.row || s.left === null) return `${paint(GRAY, "●")} ${name} --`;
+  const glyph = glyphOf(s.agent);
+  if (!s.row || s.left === null) return `${paint(GRAY, glyph)} ${paint(GRAY, `${name} --`)}`;
   const hex = s.sev ? SEV_COLOR[s.sev] : GRAY;
-  const mark = paint(hex, s.sev === "ok" ? "●" : "▲");
+  const flag = s.sev === "ok" ? "" : "▲";
   const win = s.row.limit === "-" ? "" : ` ${s.row.limit}`;
   const reset = s.row.resetAt ? ` ↻${until(s.row.resetAt)}` : "";
-  return `${mark} ${paint(hex, name)} ${paint(hex, `${Math.round(s.left)}%`)}${win}${reset}`;
+  // The glyph keeps the agent's identity color; the text carries the status color.
+  return `${paint(brand(s.agent), glyph)} ${paint(hex, `${name} ${Math.round(s.left)}%${flag}${win}${reset}`)}`;
 });
 if (hidden > 0) segments.push(paint(hiddenAttention > 0 ? ORANGE : GRAY, hiddenAttention > 0 ? `+${hidden} (${hiddenAttention}▲)` : `+${hidden} ok`));
 if (staleSince) segments.push(paint(GRAY, "⟳stale"));
@@ -106,7 +108,7 @@ console.log(`AI USAGE  ·  ${live.length} connected${attentionCount ? `  ·  ${a
 if (staleSince) console.log(`⚠ Showing data from ${until(Date.now() + (Date.now() - staleSince))} ago (${failure}) | color=${ORANGE} size=11`);
 if (best) {
   const reset = best.nextResetAt ? `  ·  resets in ${until(best.nextResetAt)}` : "";
-  console.log(`Use first: ${best.agent}  ·  ${Math.round(best.left ?? 0)}% left${reset} | color=${brand(best.agent)} size=13 sfimage=bolt.fill sfcolor=${brand(best.agent)}`);
+  console.log(`Use first: ${best.agent}  ·  ${Math.round(best.left ?? 0)}% left${reset} | color=${brand(best.agent)} size=13 sfimage=${symbolOf(best.agent)} sfcolor=${brand(best.agent)}`);
 } else if (blockedAll) {
   console.log(`All limits reached | color=${RED} size=13 sfimage=exclamationmark.octagon.fill sfcolor=${RED}`);
 }
@@ -135,7 +137,7 @@ for (const pool of sortedPools) {
   const reset = w?.resetAt ? `↻${until(w.resetAt)}` : "";
   const pct = left === null ? "--" : `${Math.round(left)}%`;
   // Top line: severity icon, name, worst window. Details live in the submenu so the dropdown stays short.
-  console.log(`${poolName(pool).padEnd(18)} ${pct.padStart(4)} ${win.padEnd(2)} ${reset}${badge} | font=Menlo size=13 color=${sev === "ok" || !sev ? brand(pool.agent) : hex} sfimage=circle.fill sfcolor=${brand(pool.agent)} trim=false`);
+  console.log(`${poolName(pool).padEnd(18)} ${pct.padStart(4)} ${win.padEnd(2)} ${reset}${badge} | font=Menlo size=13 color=${sev === "ok" || !sev ? brand(pool.agent) : hex} sfimage=${symbolOf(pool.agent)} sfcolor=${brand(pool.agent)} trim=false`);
   if (pool.account !== "default") console.log(`--${clean(pool.account)} | color=${GRAY} size=11`);
   const rows: Row[] = [...pool.rows].sort((a, b) => order(a.limit) - order(b.limit));
   for (const row of rows) {
@@ -166,7 +168,7 @@ if (infoPools.length) {
   for (const pool of infoPools) {
     const detail = clean(pool.rows[0]?.note ?? "connected");
     const who = pool.account !== "default" ? `  ·  ${clean(pool.account.replace(/\s*\(.*$/, ""))}` : "";
-    console.log(`⚪ ${poolName(pool)}${who}  ·  ${detail} | size=12 color=${GRAY}`);
+    console.log(`${glyphOf(pool.agent)} ${poolName(pool)}${who}  ·  ${detail} | size=12 color=${GRAY}`);
   }
   console.log("---");
 }
@@ -177,7 +179,7 @@ if (offline.length) {
     const reason = clean(pool.rows[0]?.note ?? "no data");
     const fix = /rate limited/.test(reason) ? undefined : LOGIN[pool.agent];
     const action = fix ? ` shell=/bin/zsh param1=-lc param2='${fix}' terminal=true` : "";
-    console.log(`${pool.agent}  ·  ${reason}${fix ? `   (click: ${fix})` : ""} | sfimage=exclamationmark.circle sfcolor=${ORANGE} color=${GRAY} size=12${action}`);
+    console.log(`${glyphOf(pool.agent)} ${pool.agent}  ·  ${reason}${fix ? `   (click: ${fix})` : ""} | sfimage=exclamationmark.circle sfcolor=${ORANGE} color=${GRAY} size=12${action}`);
   }
   console.log("---");
 }

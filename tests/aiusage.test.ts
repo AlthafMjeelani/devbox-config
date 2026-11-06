@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
-  diffAlerts, forecast, pickBest, poolSeverities, poolSeverity, selectMenubar, severity, summarizeAgents, until, worstRow, type Pool, type Row,
+  diffAlerts, forecast, glyphOf, symbolOf, pickBest, poolSeverities, poolSeverity, selectMenubar, severity, summarizeAgents, until, worstRow, type Pool, type Row,
 } from "../swiftbar/.config/swiftbar/lib/aiusage";
 
 const NOW = 1_700_000_000_000;
@@ -97,5 +97,15 @@ describe("pickBest", () => {
     const a = pool("Claude", 95), b = pool("Codex", 92), blocked = pool("Amp", 100, { status: "blocked" });
     expect(pickBest([a, b, blocked], NOW)?.agent).toBe("Codex");
     expect(pickBest([blocked], NOW)).toBeUndefined();
+  });
+});
+
+describe("agent icons", () => {
+  test("every known agent has a distinct glyph and symbol, unknown agents fall back", () => {
+    const agents = ["Codex", "Claude", "Amp", "Antigravity", "Kimi", "CommandCode", "OpenCode"];
+    expect(new Set(agents.map(glyphOf)).size).toBe(agents.length);
+    expect(new Set(agents.map(symbolOf)).size).toBe(agents.length);
+    expect(glyphOf("Mystery")).toBe("◆");
+    expect(symbolOf("Mystery")).toBe("circle.fill");
   });
 });

@@ -36,9 +36,9 @@ Edit the numbers in `plugins/system-monitor.10s.ts` to taste. The parsing logic 
 Runs `ai-usage --json` (from the `scripts` package) every 5 minutes.
 
 **Menu bar**: shows what needs attention first, then the best agent to spend next, for example
-`▲ Cl 8% 5h ↻59m   ● Amp 90%   ● Cx 70% 7d ↻3d 11h   +4 ok`.
+`✺ Cl 8%▲ 5h ↻59m   ϟ Amp 90%   ⌘ Cx 70% 7d ↻3d 11h   +4 ok`.
 At most 3 agents are shown; the rest collapse into `+N ok` (or `+N (2▲)` if some of the hidden ones need attention).
-`▲` means low or on pace to run out, `●` means healthy, `↻` is the time until the quota resets.
+Each agent has its own icon (Codex ⌘, Claude ✺, Amp ϟ, Antigravity △, Kimi ☾, CommandCode ❯, OpenCode {}) in its identity color. The text after it takes the status color, with a `▲` when it is low or on pace to run out. `↻` is the time until the quota resets. In the dropdown each agent gets its own SF Symbol icon. The icons are generic shapes, not vendor logos.
 
 **Dropdown**: agents sorted worst first. Each agent is one line (quota left, worst window, reset); hover it for every window, a usage bar and the burn-rate forecast (`at 23%/h you hit the limit in 20m`, plus the pace that is safe).
 
