@@ -32,6 +32,35 @@ Colour and decoration alone do not create hierarchy or explain a business insigh
 - Use `data-visualization`, `infographic-diagram` or `screenshot-documentation` only when their content is actually needed.
 - Keep examples close to the concept they explain; label all fictional values at the point of use.
 
+## Premium PowerPoint standard
+
+Apply this section to every presentation, whether it is new or being revised.
+Do not treat a plain white slide with text as a finished professional presentation.
+Give every slide an intentional composition that fits its message and audience.
+
+- Match backgrounds to the business context and brand.
+- Alternate light and dark sections deliberately, use subtle texture or shapes only when they support the content, and maintain strong contrast.
+- Choose visual forms that explain the information: connected diagrams for processes, layered diagrams for architecture, comparisons for alternatives, charts for supported measures, timelines for milestones, and annotated steps for instructions.
+- Vary the layouts across a deck. Use editorial openings, split screens, full-width evidence, process views, comparison layouts, examples, and section transitions where appropriate.
+- Do not repeat a generic card grid or turn every subject into bullets.
+- Use relevant diagrams, illustrations, icons, or screenshots when they improve understanding. Avoid decorative stock imagery and invented evidence.
+- Use a consistent font system, strong headline hierarchy, readable body text, concise labels, and balanced whitespace. Fix wrapping and crowding by shortening copy or changing the layout before reducing type size.
+- Use brand-aligned colour and restrained visual texture without reducing legibility. Colour must not be the only way information is distinguished.
+
+### Mandatory visual review for presentations
+
+Do not deliver a presentation before reviewing the exported deck visually.
+
+1. Render every slide from the final exported file.
+2. Create and inspect a contact sheet for deck-level rhythm and repeated layouts.
+3. Inspect every slide at full size for hierarchy, readability, tiny text, unused space, wrapping, clipping, overlap, contrast, and diagram accuracy.
+4. Identify and improve slides that look repetitive, sparse without purpose, crowded, or like a document page pasted into PowerPoint.
+5. Render again after layout changes and inspect the revised slides and contact sheet.
+6. Run the format-specific overflow or structural checks available, and report any check that could not run.
+
+The final deck must be professional, brand-consistent, easy to understand, client-ready, and free of unintended clipping and overlap.
+Keep sample data clearly labelled and distinct from verified live results.
+
 ## Build in the right format
 
 Read only the relevant sections of [references/formats.md](references/formats.md).

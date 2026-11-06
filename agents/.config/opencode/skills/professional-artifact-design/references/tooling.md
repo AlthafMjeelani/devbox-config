@@ -1,10 +1,10 @@
 # Tooling and optional foundations
 
 This pack adds original, portable design and review guidance.
-It does not bundle third-party document engines or assume a particular agent vendor.
+The shared devbox pack vendors third-party format skills alongside these standards; host-required tools still take precedence.
 Use the installed host's format skills and required libraries first; preserve existing skills rather than overwriting names such as `frontend-design`.
 
-Anthropic's official repository documents these optional foundations:
+Anthropic's official repository supplies these installed foundations:
 
 - [PPTX](https://github.com/anthropics/skills/tree/main/skills/pptx)
 - [PDF](https://github.com/anthropics/skills/tree/main/skills/pdf)
@@ -16,7 +16,7 @@ Anthropic's official repository documents these optional foundations:
 - [Web Artifacts Builder](https://github.com/anthropics/skills/tree/main/skills/web-artifacts-builder)
 
 The repository distinguishes source-available document skills from its open-source examples.
-Keep original licensing/notices if importing upstream material; this pack links to it instead of copying it.
+Keep original licensing/notices if importing upstream material; the vendored packages preserve their notices and the source manifest records pinned revisions.
 
 For a user-authorised Claude Code installation, the documented marketplace commands are:
 

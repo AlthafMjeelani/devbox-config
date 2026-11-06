@@ -1,0 +1,225 @@
+{
+  "skills": [
+    {
+      "name": "anthropic-frontend-design",
+      "repository": "anthropics/skills",
+      "path": "skills/frontend-design",
+      "revision": "ca45fc496a3436251f191354091d557da31c15b5",
+      "local_changes": [
+        "Frontmatter renamed to preserve existing frontend-design"
+      ]
+    },
+    {
+      "name": "pptx",
+      "repository": "anthropics/skills",
+      "path": "skills/pptx",
+      "revision": "ca45fc496a3436251f191354091d557da31c15b5",
+      "local_changes": []
+    },
+    {
+      "name": "pdf",
+      "repository": "anthropics/skills",
+      "path": "skills/pdf",
+      "revision": "ca45fc496a3436251f191354091d557da31c15b5",
+      "local_changes": []
+    },
+    {
+      "name": "docx",
+      "repository": "anthropics/skills",
+      "path": "skills/docx",
+      "revision": "ca45fc496a3436251f191354091d557da31c15b5",
+      "local_changes": []
+    },
+    {
+      "name": "xlsx",
+      "repository": "anthropics/skills",
+      "path": "skills/xlsx",
+      "revision": "ca45fc496a3436251f191354091d557da31c15b5",
+      "local_changes": []
+    },
+    {
+      "name": "theme-factory",
+      "repository": "anthropics/skills",
+      "path": "skills/theme-factory",
+      "revision": "ca45fc496a3436251f191354091d557da31c15b5",
+      "local_changes": []
+    },
+    {
+      "name": "doc-coauthoring",
+      "repository": "anthropics/skills",
+      "path": "skills/doc-coauthoring",
+      "revision": "ca45fc496a3436251f191354091d557da31c15b5",
+      "local_changes": []
+    },
+    {
+      "name": "canvas-design",
+      "repository": "anthropics/skills",
+      "path": "skills/canvas-design",
+      "revision": "ca45fc496a3436251f191354091d557da31c15b5",
+      "local_changes": []
+    },
+    {
+      "name": "brand-guidelines",
+      "repository": "anthropics/skills",
+      "path": "skills/brand-guidelines",
+      "revision": "ca45fc496a3436251f191354091d557da31c15b5",
+      "local_changes": []
+    },
+    {
+      "name": "algorithmic-art",
+      "repository": "anthropics/skills",
+      "path": "skills/algorithmic-art",
+      "revision": "ca45fc496a3436251f191354091d557da31c15b5",
+      "local_changes": []
+    },
+    {
+      "name": "internal-comms",
+      "repository": "anthropics/skills",
+      "path": "skills/internal-comms",
+      "revision": "ca45fc496a3436251f191354091d557da31c15b5",
+      "local_changes": []
+    },
+    {
+      "name": "webapp-testing",
+      "repository": "anthropics/skills",
+      "path": "skills/webapp-testing",
+      "revision": "ca45fc496a3436251f191354091d557da31c15b5",
+      "local_changes": []
+    },
+    {
+      "name": "web-artifacts-builder",
+      "repository": "anthropics/skills",
+      "path": "skills/web-artifacts-builder",
+      "revision": "ca45fc496a3436251f191354091d557da31c15b5",
+      "local_changes": []
+    },
+    {
+      "name": "web-design-guidelines",
+      "repository": "vercel-labs/agent-skills",
+      "path": "skills/web-design-guidelines",
+      "revision": "1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62",
+      "local_changes": []
+    },
+    {
+      "name": "vercel-react-best-practices",
+      "repository": "vercel-labs/agent-skills",
+      "path": "skills/react-best-practices",
+      "revision": "1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62",
+      "local_changes": []
+    },
+    {
+      "name": "vercel-composition-patterns",
+      "repository": "vercel-labs/agent-skills",
+      "path": "skills/composition-patterns",
+      "revision": "1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62",
+      "local_changes": []
+    },
+    {
+      "name": "vercel-react-native-skills",
+      "repository": "vercel-labs/agent-skills",
+      "path": "skills/react-native-skills",
+      "revision": "1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62",
+      "local_changes": []
+    },
+    {
+      "name": "ui-ux-pro-max",
+      "repository": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "path": ".claude/skills/ui-ux-pro-max",
+      "revision": "b7d5353e0130feb8c5574ef1251f8a1db1873ccb",
+      "local_changes": [
+        "Replaced Claude plugin-root paths with host-independent skill-directory placeholders."
+      ]
+    },
+    {
+      "name": "design-system",
+      "repository": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "path": ".claude/skills/design-system",
+      "revision": "b7d5353e0130feb8c5574ef1251f8a1db1873ccb",
+      "local_changes": []
+    },
+    {
+      "name": "slides",
+      "repository": "nextlevelbuilder/ui-ux-pro-max-skill",
+      "path": ".claude/skills/slides",
+      "revision": "b7d5353e0130feb8c5574ef1251f8a1db1873ccb",
+      "local_changes": []
+    },
+    {
+      "name": "impeccable",
+      "repository": "pbakaus/impeccable",
+      "path": "plugin/skills/impeccable",
+      "revision": "c3bb418ee38ee49a6b999b7752c1368f3123a2bd",
+      "local_changes": []
+    },
+    {
+      "name": "shadcn",
+      "repository": "shadcn-ui/ui",
+      "path": "skills/shadcn",
+      "revision": "d549251bab2e57dbf72f7c909d6458c02c43f529",
+      "local_changes": []
+    },
+    {
+      "name": "mermaid-diagrams",
+      "repository": "championswimmer/tech-doc-skills",
+      "path": "skills/mermaid-diagrams",
+      "revision": "860bbf9d483deff584f57b09f85072a7b44bb8f9",
+      "local_changes": []
+    },
+    {
+      "name": "web-research",
+      "repository": "championswimmer/tech-doc-skills",
+      "path": "skills/web-research",
+      "revision": "860bbf9d483deff584f57b09f85072a7b44bb8f9",
+      "local_changes": []
+    },
+    {
+      "name": "frontend-slides",
+      "repository": "zarazhangrui/frontend-slides",
+      "path": "plugins/frontend-slides/skills/frontend-slides",
+      "revision": "9906a34d640d2111f724544cbc50f7f130569ae1",
+      "local_changes": []
+    },
+    {
+      "name": "agent-browser",
+      "repository": "vercel-labs/agent-browser",
+      "path": "skills/agent-browser",
+      "revision": "71850a021c5cb694513d720d61c156dd317d63cf",
+      "local_changes": []
+    },
+    {
+      "name": "design-mobile-apps",
+      "repository": "designed-by-ai/skills",
+      "path": "skills/design-mobile-apps",
+      "revision": "03c20aec6dcedb5fabfb03dc37982eb52ef19ed6",
+      "local_changes": []
+    },
+    {
+      "name": "slidewright",
+      "repository": "tronghieu/agent-skills",
+      "path": "skills/slidewright",
+      "revision": "831d1ae5c686a81b10f9c5b9cca04a7b8b97303d",
+      "local_changes": []
+    },
+    {
+      "name": "presentation-creator",
+      "repository": "getsentry/skills",
+      "path": "skills/presentation-creator",
+      "revision": "e94f22214528d69899d09c627b3315ddc3544816",
+      "local_changes": []
+    },
+    {
+      "name": "ui-design",
+      "repository": "uizze/uizze",
+      "path": "skills/ui-design",
+      "revision": "fc401e9e654cbafe427b0c98142fc8bccd0c4e7e",
+      "local_changes": []
+    }
+  ],
+  "unavailable": [
+    {
+      "name": "ui-taste",
+      "source": "https://uizze.sh/",
+      "reason": "Publisher returned HTTP 403; installed the separately named public ui-design package from uizze/uizze instead."
+    }
+  ]
+}

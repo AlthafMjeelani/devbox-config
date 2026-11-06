@@ -49,7 +49,7 @@ Project-specific rules live in each repo's own `AGENTS.md`.
 - Prefer targeted `grep` / read over broad `find` / `cat`.
 
 ## Business artifacts
-- For polished reports, presentations, workbooks or interactive deliverables, use `professional-artifact-design` with the installed format skill.
+- For polished reports, presentations, workbooks or interactive deliverables, use `premium-artifact-design-director`, which routes to `professional-artifact-design` and the installed format skill.
   Apply `artifact-quality-review` before delivery; keep illustrative data and live verified results distinct.
 
 ## Kimi Code & Antigravity role routing

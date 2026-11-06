@@ -5,11 +5,13 @@ import { resolve } from "node:path";
 
 const repo = resolve(import.meta.dir, "..");
 const skills = resolve(repo, "agents/.config/opencode/skills");
+const upstream = JSON.parse(readFileSync(resolve(repo, "agents/design-skills.sources.json"), "utf8")).skills as { name: string; revision: string; repository: string; path: string }[];
 const pack = [
   "professional-artifact-design", "content-storytelling", "data-visualization",
   "infographic-diagram", "technical-documentation", "screenshot-documentation",
   "interactive-prototyping", "artifact-quality-review", "business-presentation", "educational-content",
-  "proposal-writing", "prototyping-proposals",
+  "proposal-writing", "prototyping-proposals", "premium-artifact-design-director",
+  ...upstream.map((skill) => skill.name),
 ];
 
 function luminance(hex: string) {
@@ -26,6 +28,16 @@ function contrast(a: string, b: string) {
 }
 
 describe("professional artifact design pack", () => {
+  test("upstream packages have pinned provenance and matching portable entry points", () => {
+    expect(upstream.length).toBeGreaterThanOrEqual(29);
+    expect(new Set(upstream.map((skill) => skill.name)).size).toBe(upstream.length);
+    for (const skill of upstream) {
+      expect(skill.revision).toMatch(/^[a-f0-9]{40}$/);
+      const entry = readFileSync(resolve(skills, skill.name, "SKILL.md"), "utf8");
+      expect(entry).toContain(`name: ${skill.name}`);
+      expect(entry).toMatch(/\ndescription:/);
+    }
+  });
   test("theme text roles meet normal-text contrast on the canvas", () => {
     const themes = JSON.parse(readFileSync(resolve(skills, pack[0], "assets/themes.json"), "utf8"));
     for (const [name, theme] of Object.entries(themes.themes) as [string, Record<string, string>][]) {
