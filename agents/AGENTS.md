@@ -13,9 +13,28 @@ Project-specific rules live in each repo's own `AGENTS.md`.
 - Long-running local commands (flutter build apk/appbundle, gradle builds, full test runs) are normal work:
   run them with an extended timeout instead of skipping or asking.
   Never skip a build just because it takes time; only skip when the environment lacks the tool, and say so.
-- Long-running local commands (flutter build apk/appbundle, gradle builds, full test runs) are normal work:
-  run them with an extended timeout instead of skipping or asking.
-  Never skip a build just because it takes time; only skip when the environment lacks the tool, and say so.
+
+## Coding workflow
+Before changing any code:
+1. Read the repo's own instructions first: `AGENTS.md` (or `CLAUDE.md`) at the repo root and in the folder you will touch, then `README` / `CONTRIBUTING` for commands.
+   Follow them over these defaults. If none exist, say so and infer commands from `package.json`, `Makefile`, `pubspec.yaml`, `go.mod` and similar.
+2. Check `git status` and the current branch.
+   Never edit on `main`, `master`, `develop` or the repo's default branch. Create or switch to a feature branch first.
+   Name it by intent: `feat/<topic>`, `fix/<topic>`, `chore/<topic>`, `docs/<topic>`, `refactor/<topic>`.
+   If the current branch holds unrelated work, start a new branch from the default branch (or ask).
+   If there are uncommitted changes you did not make, stop and surface them.
+3. State the scope in one line. Plan first when the change is non-trivial.
+
+While coding:
+- Keep changes small and focused; follow the existing conventions, structure and tokens.
+- Reproduce a bug before fixing it. Add or update tests with the change.
+- Run the project's lint, typecheck and tests, and fix what your change broke.
+
+Before finishing:
+- Review your own `git diff` and remove stray edits.
+- Report what changed, what you verified (with command output) and what you did not.
+- Leave the work committed on the feature branch only if asked. Do not push, merge or open a PR unless asked.
+- For parallel agents, give each its own worktree and branch (`git-wt`, `crew`).
 
 ## Safety
 - Confirm before hard-to-reverse or outward-facing actions (push, deploy, delete, send).
@@ -24,7 +43,7 @@ Project-specific rules live in each repo's own `AGENTS.md`.
 
 ## Commits
 - Conventional-commit style subjects (`feat:`, `fix:`, `chore:` ...).
-- Commit or push only when asked. Branch first if on the default branch.
+- Commit or push only when asked. All work happens on a feature branch (see Coding workflow), never on the default branch.
 - Never auto-add the agent name as a co-author or `Co-Authored-By` trailer.
 
 ## Quality bar

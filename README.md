@@ -64,6 +64,16 @@ Three skills teach your agents the workflow: `agent-orchestration` (plan, dispat
 
 If Rex says the CLI is not allowed, turn on Remote Control in Rex settings. `rex config check` validates `init.lua`; a binding that Rex rejects can simply be deleted, because Rex works with no config.
 
+## Where agent rules live
+
+| File | Applies to | Use it for |
+|---|---|---|
+| `agents/AGENTS.md` (this repo) | every agent, every project, via `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and the other links | the **coding workflow** (read the project's `AGENTS.md` first, always work on a feature branch), safety, commits, quality bar |
+| `AGENTS.md` in each project repo | that project only | stack, commands, conventions, folder map, branch and PR rules for the team |
+| `agents/.claude/settings.json`, `agents/.codex/rules/default.rules` | one tool | hard permissions, for example denying `git push` |
+
+Edit `agents/AGENTS.md`, commit, and every agent picks it up on its next session. Keep it short, because it loads into every agent's context. Put project details in the project's own `AGENTS.md`, not here.
+
 ## What is inside
 
 | Folder | What it configures |
