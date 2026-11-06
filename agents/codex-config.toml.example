@@ -1,8 +1,30 @@
 # Copy the settings below into ~/.codex/config.toml on each machine.
 # Do not symlink this file: Codex appends local project trust and TUI state.
 
+# Model: keep the newest flagship as the default; pick tiers per task with profiles below (codex -p fast|standard|deep).
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
+
+# Token budget: summarize before the window fills (set to ~60-70% of the model's context window)
+# and cap how much tool output stays in context. A very large compact limit disables compaction.
+model_auto_compact_token_limit = 150000
+tool_output_token_limit = 12000
+
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
+
+# Profiles: one flag switches model and effort. Do not switch models mid-session (breaks prompt caching).
+[profiles.fast]
+model = "gpt-5.6-luna"
+model_reasoning_effort = "low"
+
+[profiles.standard]
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
+
+[profiles.deep]
+model = "gpt-5.6-sol"
+model_reasoning_effort = "high"
 
 [tui]
 status_line_use_colors = false

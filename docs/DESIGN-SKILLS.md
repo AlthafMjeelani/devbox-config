@@ -122,3 +122,8 @@ Do not commit or push unless requested.
 ## Mobile and config skills
 - `mobile-app-development` - entry point for any mobile app request; always routes to the Flutter skills first
 - `env-and-secrets` - `.env.example` with safe samples, `.gitignore` rules, secrets handling; stack templates included
+
+## Models and context skills
+- `model-routing` - newest model and effort per task and per agent
+- `context-management` - compact, start fresh, hand off through files, read less
+- `project-agents-md` - write a short, accurate AGENTS.md for any repository

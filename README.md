@@ -25,6 +25,7 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 | Remove a part | `make unstow PKG="nvim"` |
 | Also set up the zsh config | `./setup.sh --shell` |
 | See usage and quota for every agent | `ai-usage` (or the menu bar; on Linux `ai-usage-bar`) |
+| Pick models and save tokens | see [`docs/MODELS.md`](docs/MODELS.md); Codex: `codex -p fast|standard|deep` |
 | Run parallel agents in worktrees | `crew new "<task>" --claude` (see `agent-orchestration`) |
 | Run and message agents in Rex | `rex-agents spawn <name> -C <dir> -- claude`, `rex-agents send <name> "..."` |
 | Check a project's env files and gitignore | `env-check` (add missing keys to `.env.example` with `env-check --sync`) |
@@ -33,7 +34,7 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 
 ## What you get
 
-**One skill set for every agent.** All 122 skills live in `agents/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
+**One skill set for every agent.** All 125 skills live in `agents/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
 
 **A macOS menu bar** (SwiftBar) with two plugins:
 

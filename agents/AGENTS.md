@@ -72,6 +72,8 @@ Before finishing:
   Regenerate them with their tool.
 
 ## Token efficiency
+- Use the newest model in the right tier for the task (`model-routing`); do not switch models mid-session.
+- One task per session; compact at about 65% of the window; keep plans and handoffs in files (`context-management`).
 - Don't re-read files already shown in context.
 - Reviews: findings first, severity-tagged, one line of context each. Don't summarize a diff the user can read.
 - Prefer targeted `grep` / read over broad `find` / `cat`.
