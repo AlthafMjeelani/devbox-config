@@ -64,6 +64,9 @@ After adding or pulling them, run `make agents-sync && make restow-agents`.
 Start a new session or refresh skills in each host to discover additions.
 The optional Anthropic foundation links and Claude-only marketplace commands are documented in `professional-artifact-design/references/tooling.md`; they are not installed by the shared pack.
 
+The shared set also includes `proposal-writing` and `prototyping-proposals` for commercially scoped proposals and client demonstration material.
+Keep the proposal builder, Word template and logo assets together with the skill; its DOCX workflow depends on the complete package.
+
 ## Generated Subagents
 
 OpenCode remains the canonical source for role prompts:

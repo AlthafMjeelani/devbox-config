@@ -9,6 +9,7 @@ const pack = [
   "professional-artifact-design", "content-storytelling", "data-visualization",
   "infographic-diagram", "technical-documentation", "screenshot-documentation",
   "interactive-prototyping", "artifact-quality-review", "business-presentation", "educational-content",
+  "proposal-writing", "prototyping-proposals",
 ];
 
 function luminance(hex: string) {
