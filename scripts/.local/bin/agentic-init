@@ -1,0 +1,88 @@
+#!/usr/bin/env bun
+// agentic-init - scaffold the standard agentic files into a repo. Never overwrites existing files.
+//
+//   agentic-init [dir]            Create missing files.
+//   agentic-init [dir] --dry-run  Show what would be created.
+//   agentic-init [dir] --check    Audit: list missing files and leftover TODO markers. Exit 1 if any missing.
+import fs from "node:fs";
+import path from "node:path";
+
+const argv = process.argv.slice(2);
+if (argv.includes("-h") || argv.includes("--help")) {
+  console.log(fs.readFileSync(import.meta.path, "utf8").split("\n").slice(1, 6).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
+  process.exit(0);
+}
+const dry = argv.includes("--dry-run");
+const check = argv.includes("--check");
+const dir = path.resolve(argv.find((a) => !a.startsWith("-")) ?? ".");
+const name = path.basename(dir);
+
+export const FILES: Record<string, string> = {
+  "AGENTS.md": `# ${name}
+
+TODO: one line on what this project is.
+
+## Commands
+- Install: TODO
+- Run: TODO
+- Test: TODO
+- Lint/format: TODO
+
+## Structure
+TODO: key folders and what lives in them.
+
+## Rules
+- Work on a feature branch, never directly on the default branch.
+- Read the relevant file in docs/ before changing a subsystem.
+- Update docs and .env.example in the same change as the code.
+- Mobile apps use Flutter. See docs/SKILLS.md for the skills that apply.
+- Never commit secrets.
+
+## Docs
+- docs/ARCHITECTURE.md, docs/DECISIONS.md, docs/SKILLS.md, docs/PLAN.md
+`,
+  "README.md": `# ${name}\n\nTODO: what it is and how to run it.\n`,
+  ".env.example": `# Copy to .env and fill in. Never commit .env.\n# EXAMPLE_API_KEY=your-key-here\n`,
+  "docs/ARCHITECTURE.md": `# Architecture\n\nTODO: components, data flow, external services.\n`,
+  "docs/DECISIONS.md": `# Decisions\n\n| Date | Decision | Reason |\n|---|---|---|\n| TODO | TODO | TODO |\n`,
+  "docs/SKILLS.md": `# Skills for this repo\n\nList the shared skills agents should use here, for example:\n- senior-backend-engineer, auth-and-identity\n- mobile-app-development (Flutter), flutter-ui-ux-design\n- admin-panel-dashboard-design, frontend-design\n- env-and-secrets, model-routing, context-management\n\nTODO: keep only the ones that apply.\n`,
+  "docs/PLAN.md": `# Plan\n\n## Now\n- [ ] TODO\n\n## Next\n\n## Blockers\n`,
+};
+
+
+export function scaffold(root: string, dryRun: boolean): string[] {
+  const created: string[] = [];
+  for (const [rel, body] of Object.entries(FILES)) {
+    const p = path.join(root, rel);
+    if (fs.existsSync(p)) continue;
+    created.push(rel);
+    if (dryRun) continue;
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, body);
+  }
+  const claude = path.join(root, "CLAUDE.md");
+  let hasClaude = true;
+  try { fs.lstatSync(claude); } catch { hasClaude = false; }
+  if (!hasClaude) {
+    created.push("CLAUDE.md");
+    if (!dryRun) fs.symlinkSync("AGENTS.md", claude);
+  }
+  return created;
+}
+
+if (import.meta.main) {
+  if (!fs.existsSync(dir)) { console.error(`no such directory: ${dir}`); process.exit(2); }
+  if (check) {
+    const miss = Object.keys(FILES).filter((f) => !fs.existsSync(path.join(dir, f)));
+    try { fs.lstatSync(path.join(dir, "CLAUDE.md")); } catch { miss.push("CLAUDE.md"); }
+    for (const m of miss) console.log(`MISSING  ${m}`);
+    for (const f of Object.keys(FILES)) {
+      const p = path.join(dir, f);
+      if (fs.existsSync(p) && /\bTODO\b/.test(fs.readFileSync(p, "utf8"))) console.log(`TODO     ${f}`);
+    }
+    if (!miss.length) console.log("all agentic files present");
+    process.exit(miss.length ? 1 : 0);
+  }
+  const made = scaffold(dir, dry);
+  console.log(made.length ? made.map((f) => `${dry ? "would create" : "created"}  ${f}`).join("\n") : "nothing to do");
+}

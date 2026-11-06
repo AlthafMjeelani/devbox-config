@@ -241,9 +241,9 @@ describe("Crew Amp execution", () => {
 
   test("propagates bounded auto-approval to every OpenCode subagent", () => {
     const settingsPath = resolve(repo, "scripts/.local/share/agentic/opencode-crew-settings.json");
-    const command = callCrewFunction(`OPENCODE_CREW_SETTINGS='${settingsPath}'; opencode_headless_command openai/gpt-5.6-terra 'finish task'`);
+    const command = callCrewFunction(`OPENCODE_CREW_SETTINGS='${settingsPath}'; opencode_headless_command openai/gpt-6.1-terra 'finish task'`);
     expect(command).toContain("CREW_MANAGED=1 OPENCODE_CONFIG_CONTENT=");
-    expect(command).toContain("opencode run --model openai/gpt-5.6-terra");
+    expect(command).toContain("opencode run --model openai/gpt-6.1-terra");
     expect(command).toContain("--agent build --auto");
 
     const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
@@ -283,18 +283,18 @@ describe("Crew Amp execution", () => {
   });
 
   test("keeps the Codex fast model and reasoning effort separate", () => {
-    expect(callCrewFunction("resolve_profile fast codex")).toBe("gpt-5.6-luna");
-    const headless = callCrewFunction("codex_headless_command gpt-5.6-luna fast 'finish task'");
-    const interactive = callCrewFunction("codex_interactive_command gpt-5.6-luna fast");
-    expect(headless).toContain("codex exec --model gpt-5.6-luna");
+    expect(callCrewFunction("resolve_profile fast codex")).toBe("gpt-6-luna");
+    const headless = callCrewFunction("codex_headless_command gpt-6-luna fast 'finish task'");
+    const interactive = callCrewFunction("codex_interactive_command gpt-6-luna fast");
+    expect(headless).toContain("codex exec --model gpt-6-luna");
     expect(headless).toContain("model_reasoning_effort=low");
-    expect(interactive).toContain("codex --model gpt-5.6-luna");
+    expect(interactive).toContain("codex --model gpt-6-luna");
     expect(interactive).toContain("model_reasoning_effort=low");
     expect(headless).not.toContain("luna-low");
   });
 
   test("does not override Codex reasoning effort outside the fast profile", () => {
-    expect(callCrewFunction("codex_headless_command gpt-5.6-terra standard 'finish task'")).not.toContain(
+    expect(callCrewFunction("codex_headless_command gpt-6.1-terra standard 'finish task'")).not.toContain(
       "model_reasoning_effort",
     );
   });

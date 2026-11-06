@@ -318,3 +318,11 @@ them), so an LLM verdict is never trusted as an exit code. Commit your work befo
 gate validates commits, and it refuses to run on the default branch. Requires `jq` and `gh`.
 `gate` inherits the shell environment you run it from. Put worktree-specific bootstrap in
 `.worktrees-setup`, for example copying `.env` from `$GIT_WT_MAIN` and installing dependencies.
+
+## agentic-init - scaffold agentic files into a repo
+
+```sh
+agentic-init [dir] --dry-run   # show what would be created
+agentic-init [dir]             # create AGENTS.md, CLAUDE.md link, docs/*, .env.example (never overwrites)
+agentic-init [dir] --check     # list missing files and leftover TODO markers
+```

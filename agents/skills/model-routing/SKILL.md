@@ -10,9 +10,9 @@ Use the strongest model where mistakes are expensive, and the cheapest one that 
 ## Task to tier
 | Task | Tier | Claude | Codex | Effort |
 |---|---|---|---|---|
-| Architecture, security review, hard or unclear bugs, risky refactors | deep | `opus` | `gpt-5.6-sol` | high |
-| Normal features, fixes, tests, code review | standard | `sonnet` | `gpt-5.6-terra` | medium |
-| Docs, renames, formatting, search, summaries, commit messages | fast | `haiku` | `gpt-5.6-luna` | low |
+| Architecture, security review, hard or unclear bugs, risky refactors | deep | `opus` | `gpt-6.1-sol` | high |
+| Normal features, fixes, tests, code review | standard | `sonnet` | `gpt-6.1-terra` | medium |
+| Docs, renames, formatting, search, summaries, commit messages | fast | `haiku` | `gpt-6-luna` | low |
 
 Antigravity: `gemini-3.1-pro-high` for deep and standard, `gemini-3.6-flash-*` for fast. The source of truth for roles is `agents/models.json`; change it there, then run `agents-sync`.
 

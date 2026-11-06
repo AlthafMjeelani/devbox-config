@@ -2,7 +2,7 @@
 # Do not symlink this file: Codex appends local project trust and TUI state.
 
 # Model: keep the newest flagship as the default; pick tiers per task with profiles below (codex -p fast|standard|deep).
-model = "gpt-5.6-terra"
+model = "gpt-6.1-terra"
 model_reasoning_effort = "medium"
 
 # Token budget: summarize before the window fills (set to ~60-70% of the model's context window)
@@ -15,15 +15,15 @@ sandbox_mode = "workspace-write"
 
 # Profiles: one flag switches model and effort. Do not switch models mid-session (breaks prompt caching).
 [profiles.fast]
-model = "gpt-5.6-luna"
+model = "gpt-6-luna"
 model_reasoning_effort = "low"
 
 [profiles.standard]
-model = "gpt-5.6-terra"
+model = "gpt-6.1-terra"
 model_reasoning_effort = "medium"
 
 [profiles.deep]
-model = "gpt-5.6-sol"
+model = "gpt-6.1-sol"
 model_reasoning_effort = "high"
 
 [tui]

@@ -44,6 +44,7 @@ Before finishing:
 ## Config and secrets
 - Never commit real secrets or `.env` files. Every project keeps a tracked `.env.example` with placeholder values and a `.gitignore` that ignores the real files.
 - When you add a config value, add it to `.env.example` in the same change, then run `env-check` (see `env-and-secrets`).
+- Every repo carries the standard agentic files (AGENTS.md, docs/ARCHITECTURE, DECISIONS, SKILLS, PLAN, .env.example). If any are missing, run `agentic-init` on a feature branch (see `repo-agentic-setup`) and keep them updated with the code.
 
 ## Safety
 - Confirm before hard-to-reverse or outward-facing actions (push, deploy, delete, send).

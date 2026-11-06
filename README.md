@@ -29,12 +29,13 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 | Run parallel agents in worktrees | `crew new "<task>" --claude` (see `agent-orchestration`) |
 | Run and message agents in Rex | `rex-agents spawn <name> -C <dir> -- claude`, `rex-agents send <name> "..."` |
 | Check a project's env files and gitignore | `env-check` (add missing keys to `.env.example` with `env-check --sync`) |
+| Make a repo agent-ready (AGENTS.md, docs, .env.example, plan) | `agentic-init` (preview with `--dry-run`, audit with `--check`) |
 | Allow commits on `main` in one repo | `git config devbox.allowDefaultBranch true` |
 | Edit a config | change the file in `$HOME` (it is a symlink), then `git commit` here |
 
 ## What you get
 
-**One skill set for every agent.** All 125 skills live in `agents/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
+**One skill set for every agent.** All 126 skills live in `agents/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
 
 **A macOS menu bar** (SwiftBar) with two plugins:
 

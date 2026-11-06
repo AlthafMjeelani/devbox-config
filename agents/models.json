@@ -1,69 +1,69 @@
 {
   "reviewer": {
-    "opencode": "gpt-5.6-terra",
+    "opencode": "gpt-6.1-terra",
     "claude": "opus",
-    "codex": "gpt-5.6-sol",
+    "codex": "gpt-6.1-sol",
     "antigravity": "gemini-3.1-pro-high"
   },
   "security-reviewer": {
-    "opencode": "gpt-5.6-sol-pro",
+    "opencode": "gpt-6.1-sol-pro",
     "claude": "opus",
-    "codex": "gpt-5.6-sol-pro",
+    "codex": "gpt-6.1-sol-pro",
     "antigravity": "gemini-3.1-pro-high"
   },
   "critic": {
-    "opencode": "gpt-5.6-sol-pro",
+    "opencode": "gpt-6.1-sol-pro",
     "claude": "opus",
-    "codex": "gpt-5.6-sol-pro",
+    "codex": "gpt-6.1-sol-pro",
     "antigravity": "gemini-3.1-pro-high"
   },
   "architect": {
-    "opencode": "gpt-5.6-sol",
+    "opencode": "gpt-6.1-sol",
     "claude": "opus",
-    "codex": "gpt-5.6-sol",
+    "codex": "gpt-6.1-sol",
     "antigravity": "gemini-3.1-pro-high"
   },
   "refactor-planner": {
-    "opencode": "gpt-5.6-sol",
+    "opencode": "gpt-6.1-sol",
     "claude": "opus",
-    "codex": "gpt-5.6-sol",
+    "codex": "gpt-6.1-sol",
     "antigravity": "gemini-3.1-pro-high"
   },
   "researcher": {
-    "opencode": "gpt-5.6-sol-low",
+    "opencode": "gpt-6.1-sol-low",
     "claude": "sonnet",
     "codex": {
-      "model": "gpt-5.6-sol",
+      "model": "gpt-6.1-sol",
       "reasoning_effort": "low"
     },
     "antigravity": "gemini-3.6-flash-high"
   },
   "debugger": {
-    "opencode": "gpt-5.6-sol",
+    "opencode": "gpt-6.1-sol",
     "claude": "sonnet",
-    "codex": "gpt-5.6-sol",
+    "codex": "gpt-6.1-sol",
     "antigravity": "gemini-3.1-pro-high"
   },
   "tester": {
-    "opencode": "gpt-5.6-terra",
+    "opencode": "gpt-6.1-terra",
     "claude": "sonnet",
-    "codex": "gpt-5.6-terra",
+    "codex": "gpt-6.1-terra",
     "antigravity": "gemini-3.6-flash-high"
   },
   "docs-writer": {
-    "opencode": "gpt-5.6-luna-low",
+    "opencode": "gpt-6-luna-low",
     "claude": "haiku",
     "codex": {
-      "model": "gpt-5.6-luna",
+      "model": "gpt-6-luna",
       "reasoning_effort": "low"
     },
     "antigravity": "gemini-3.6-flash-low"
   },
   "pr-writer": {
-    "opencode": "gpt-5.6-luna-low",
+    "opencode": "gpt-6-luna-low",
     "claude": "haiku",
     "codex": {
-      "model": "gpt-5.6-luna",
+      "model": "gpt-6-luna",
       "reasoning_effort": "low"
     },
     "antigravity": "gemini-3.6-flash-low"

@@ -128,15 +128,15 @@ opencode
 
 Model selection is **centralized in `opencode.json`** under the `agent` block. Commands only choose an agent; they do not choose models. Skills are prompt/tooling instructions and do not choose models.
 
-Normal initial sessions use `default_agent: build` with `model: openai/gpt-5.6-terra-low`.
-`small_model` uses `openai/gpt-5.6-luna-low` for quick, cheap helper work.
+Normal initial sessions use `default_agent: build` with `model: openai/gpt-6.1-terra-low`.
+`small_model` uses `openai/gpt-6-luna-low` for quick, cheap helper work.
 
 `build` and `reviewer` sit a notch below their tier because they run on every ship. `build` drives
 the whole ship gate (review, auto-fix, test/lint and CI fixes) and that fix work is high-volume and
 mechanical; `reviewer` backs the interactive review commands.
 
 One deliberate exception to the centralization above: `gate_review_opencode` in
-`scripts/.local/bin/gate` passes `--model openai/gpt-5.6-terra` so the gate's *review* pass runs a
+`scripts/.local/bin/gate` passes `--model openai/gpt-6.1-terra` so the gate's *review* pass runs a
 reasoning notch above its *fix* pass. The gate is a standalone script rather than a command or
 skill, and it cannot route to the `reviewer` agent - subagents are not targetable by `--agent` in
 headless runs - so the model is pinned at the call site.
@@ -287,7 +287,7 @@ Guardrails are baked into `~/AGENTS.md` and the review commands:
 - Shortest useful answer first; don't re-read files already in context.
 - Reviews: findings first, severity-tagged, one line of context each - don't summarize a diff.
 - Prefer targeted `grep`/read over broad `find`/`cat`.
-- Routing is OpenAI-only by default (`small_model` = `openai/gpt-5.6-luna-low`);
+- Routing is OpenAI-only by default (`small_model` = `openai/gpt-6-luna-low`);
   edit `opencode.json` if you want to change agent-specific model choices.
 
 ## Plugins

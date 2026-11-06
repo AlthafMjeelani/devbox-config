@@ -1,7 +1,7 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "openai/gpt-5.6-terra",
-  "small_model": "openai/gpt-5.6-luna-low",
+  "model": "openai/gpt-6.1-terra",
+  "small_model": "openai/gpt-6-luna-low",
   "default_agent": "build",
   "enabled_providers": [
     "openai",
@@ -29,7 +29,7 @@
   },
   "agent": {
     "build": {
-      "model": "openai/gpt-5.6-terra-low",
+      "model": "openai/gpt-6.1-terra-low",
       "permission": {
         "bash": {
           "*": "ask",
@@ -60,37 +60,37 @@
       }
     },
     "plan": {
-      "model": "openai/gpt-5.6-sol"
+      "model": "openai/gpt-6.1-sol"
     },
     "architect": {
-      "model": "openai/gpt-5.6-sol"
+      "model": "openai/gpt-6.1-sol"
     },
     "debugger": {
-      "model": "openai/gpt-5.6-sol"
+      "model": "openai/gpt-6.1-sol"
     },
     "tester": {
-      "model": "openai/gpt-5.6-terra"
+      "model": "openai/gpt-6.1-terra"
     },
     "reviewer": {
-      "model": "openai/gpt-5.6-terra"
+      "model": "openai/gpt-6.1-terra"
     },
     "security-reviewer": {
-      "model": "openai/gpt-5.6-sol-pro"
+      "model": "openai/gpt-6.1-sol-pro"
     },
     "docs-writer": {
-      "model": "openai/gpt-5.6-luna-low"
+      "model": "openai/gpt-6-luna-low"
     },
     "pr-writer": {
-      "model": "openai/gpt-5.6-luna-low"
+      "model": "openai/gpt-6-luna-low"
     },
     "refactor-planner": {
-      "model": "openai/gpt-5.6-sol"
+      "model": "openai/gpt-6.1-sol"
     },
     "researcher": {
-      "model": "openai/gpt-5.6-sol-low"
+      "model": "openai/gpt-6.1-sol-low"
     },
     "critic": {
-      "model": "openai/gpt-5.6-sol-pro"
+      "model": "openai/gpt-6.1-sol-pro"
     }
   },
   "provider": {
@@ -105,8 +105,8 @@
         "store": false
       },
       "models": {
-        "gpt-5.6": {
-          "name": "GPT 5.6 (OAuth)",
+        "gpt-6.1": {
+          "name": "GPT 6.1 (OAuth)",
           "limit": {
             "context": 1050000,
             "output": 128000
@@ -138,9 +138,9 @@
             }
           }
         },
-        "gpt-5.6-low": {
-          "name": "GPT 5.6 Low (OAuth)",
-          "id": "gpt-5.6",
+        "gpt-6.1-low": {
+          "name": "GPT 6.1 Low (OAuth)",
+          "id": "gpt-6.1",
           "limit": {
             "context": 1050000,
             "output": 128000
@@ -160,9 +160,9 @@
             "textVerbosity": "medium"
           }
         },
-        "gpt-5.6-pro": {
-          "name": "GPT 5.6 Pro (OAuth)",
-          "id": "gpt-5.6",
+        "gpt-6.1-pro": {
+          "name": "GPT 6.1 Pro (OAuth)",
+          "id": "gpt-6.1",
           "limit": {
             "context": 1050000,
             "output": 128000
@@ -182,8 +182,8 @@
             "textVerbosity": "medium"
           }
         },
-        "gpt-5.6-luna": {
-          "name": "GPT 5.6 Luna",
+        "gpt-6-luna": {
+          "name": "GPT 6 Luna",
           "limit": {
             "context": 1050000,
             "output": 128000
@@ -198,9 +198,9 @@
             ]
           }
         },
-        "gpt-5.6-luna-low": {
-          "name": "GPT 5.6 Luna Low",
-          "id": "gpt-5.6-luna",
+        "gpt-6-luna-low": {
+          "name": "GPT 6 Luna Low",
+          "id": "gpt-6-luna",
           "limit": {
             "context": 1050000,
             "output": 128000
@@ -220,9 +220,9 @@
             "textVerbosity": "medium"
           }
         },
-        "gpt-5.6-luna-pro": {
-          "name": "GPT 5.6 Luna Pro",
-          "id": "gpt-5.6-luna",
+        "gpt-6-luna-pro": {
+          "name": "GPT 6 Luna Pro",
+          "id": "gpt-6-luna",
           "limit": {
             "context": 1050000,
             "output": 128000
@@ -242,8 +242,8 @@
             "textVerbosity": "medium"
           }
         },
-        "gpt-5.6-terra": {
-          "name": "GPT 5.6 Terra",
+        "gpt-6.1-terra": {
+          "name": "GPT 6.1 Terra",
           "limit": {
             "context": 1050000,
             "output": 128000
@@ -258,9 +258,9 @@
             ]
           }
         },
-        "gpt-5.6-terra-low": {
-          "name": "GPT 5.6 Terra Low",
-          "id": "gpt-5.6-terra",
+        "gpt-6.1-terra-low": {
+          "name": "GPT 6.1 Terra Low",
+          "id": "gpt-6.1-terra",
           "limit": {
             "context": 1050000,
             "output": 128000
@@ -280,9 +280,9 @@
             "textVerbosity": "medium"
           }
         },
-        "gpt-5.6-terra-pro": {
-          "name": "GPT 5.6 Terra Pro",
-          "id": "gpt-5.6-terra",
+        "gpt-6.1-terra-pro": {
+          "name": "GPT 6.1 Terra Pro",
+          "id": "gpt-6.1-terra",
           "limit": {
             "context": 1050000,
             "output": 128000
@@ -302,8 +302,8 @@
             "textVerbosity": "medium"
           }
         },
-        "gpt-5.6-sol": {
-          "name": "GPT 5.6 Sol",
+        "gpt-6.1-sol": {
+          "name": "GPT 6.1 Sol",
           "limit": {
             "context": 1050000,
             "output": 128000
@@ -318,9 +318,9 @@
             ]
           }
         },
-        "gpt-5.6-sol-low": {
-          "name": "GPT 5.6 Sol Low",
-          "id": "gpt-5.6-sol",
+        "gpt-6.1-sol-low": {
+          "name": "GPT 6.1 Sol Low",
+          "id": "gpt-6.1-sol",
           "limit": {
             "context": 1050000,
             "output": 128000
@@ -340,9 +340,9 @@
             "textVerbosity": "medium"
           }
         },
-        "gpt-5.6-sol-pro": {
-          "name": "GPT 5.6 Sol Pro",
-          "id": "gpt-5.6-sol",
+        "gpt-6.1-sol-pro": {
+          "name": "GPT 6.1 Sol Pro",
+          "id": "gpt-6.1-sol",
           "limit": {
             "context": 1050000,
             "output": 128000
