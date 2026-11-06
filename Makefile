@@ -26,7 +26,7 @@ STOW_FLAGS ?= --no-folding -v
 ALL_PACKAGES := $(filter-out codex,$(patsubst %/,%,$(wildcard */)))
 
 # Packages installed by `make stow` and `make restow`.
-DEFAULT_PACKAGES := agents alacritty amp antigravity commandcode fastfetch git herdr kitty nvim opencode scripts swiftbar tmux
+DEFAULT_PACKAGES := agents alacritty amp antigravity commandcode git herdr kitty nvim opencode scripts swiftbar tmux
 
 # Packages to act on. Defaults to the active, tested package set. Override on
 # the command line for a targeted operation, e.g.

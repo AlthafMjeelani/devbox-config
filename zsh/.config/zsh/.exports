@@ -115,3 +115,4 @@ export PATH="$HOME/.kimi-code/bin:$PATH"
 
 # dart pub
 export PATH="$PATH:$HOME/.pub-cache/bin"
+export PATH="$HOME/fvm/default/bin:$PATH"

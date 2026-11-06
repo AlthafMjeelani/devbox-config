@@ -98,3 +98,18 @@ Download the complete skill directory at a chosen commit, retaining its scripts,
 Preserve the original `frontend-design` skill, reapply the documented portability adaptations and update the source manifest revision and local change notes.
 Then run the install and refresh commands above and review the resulting diff.
 Do not commit or push unless requested.
+
+## Full-Stack Engineering Skills
+- `senior-backend-engineer` - Node/NestJS/Fastify, Go, Python/FastAPI, PHP/Laravel
+- `auth-and-identity` - OAuth2/OIDC, JWT rotation, RBAC/ABAC, secure token storage
+- `fullstack-type-safety` - OpenAPI codegen, tRPC, GraphQL, freezed + Zod
+- `react-state-and-query` - TanStack Query, Zustand, RHF + Zod, Next.js caching
+- `flutter-native-and-release` - MethodChannels, FCM/APNs, deep links, Fastlane
+
+## Design Skills
+- `flutter-ui-ux-design` - Material 3 tokens, adaptive UI, painters/shaders, golden tests
+- `poster-and-social-media-design` - social sizes, OG cards, thumbnails, print bleed
+- `svg-logo-and-icon-design` - logos, icon sets, app icons and splash
+- `web-motion-and-microinteractions` - Framer Motion, scroll animation, bento, glass
+- `print-and-publication-documents` - Typst/LaTeX/WeasyPrint invoices, brochures, reports
+- `admin-panel-dashboard-design` - admin panels, dashboards and control centers with modern look and feel

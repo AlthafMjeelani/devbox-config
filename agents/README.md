@@ -161,7 +161,7 @@ make agents-sync && make restow
 
 `make stow` creates missing links.
 `make restow` refreshes links that are already managed by the selected packages and creates newly added links.
-Both use the same default package set: `agents`, `alacritty`, `fastfetch`, `git`, `herdr`, `kitty`, `niri`, `noctalia`, `nvim`, `opencode`, `scripts`, `tmux`, `zprofile`, `zsh`, and `zshenv`.
+Both use the same default package set: `agents`, `alacritty`, `git`, `herdr`, `kitty`, `niri`, `noctalia`, `nvim`, `opencode`, `scripts`, `tmux`, `zprofile`, `zsh`, and `zshenv`.
 Use `make restow-agents`, `make restow-opencode`, or `make restow-scripts` only when updating that package alone.
 
 Codex provides its bundled system skills separately from user-authored skills.
