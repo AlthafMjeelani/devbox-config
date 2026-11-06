@@ -3,7 +3,7 @@
 
 # Model: keep the newest flagship as the default; pick tiers per task with profiles below (codex -p fast|standard|deep).
 model = "gpt-6.1-terra"
-model_reasoning_effort = "medium"
+model_reasoning_effort = "low"
 
 # Token budget: summarize before the window fills (set to ~60-70% of the model's context window)
 # and cap how much tool output stays in context. A very large compact limit disables compaction.

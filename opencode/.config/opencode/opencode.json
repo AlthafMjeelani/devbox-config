@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "openai/gpt-6.1-terra",
+  "model": "openai/gpt-6.1-terra-low",
   "small_model": "openai/gpt-6-luna-low",
   "default_agent": "build",
   "enabled_providers": [
