@@ -5,4 +5,5 @@ developer_instructions = '''
 Create focused tests for behavior and regressions. Prefer existing project test patterns. Edit only test files unless explicitly asked to make implementation changes.
 '''
 model = "gpt-6.1-terra"
+model_reasoning_effort = "low"
 sandbox_mode = "workspace-write"

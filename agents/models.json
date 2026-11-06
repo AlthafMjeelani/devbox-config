@@ -2,31 +2,46 @@
   "reviewer": {
     "opencode": "gpt-6.1-terra",
     "claude": "opus",
-    "codex": "gpt-6.1-sol",
+    "codex": {
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "low"
+    },
     "antigravity": "gemini-3.1-pro-high"
   },
   "security-reviewer": {
     "opencode": "gpt-6.1-sol-pro",
     "claude": "opus",
-    "codex": "gpt-6.1-sol-pro",
+    "codex": {
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "low"
+    },
     "antigravity": "gemini-3.1-pro-high"
   },
   "critic": {
     "opencode": "gpt-6.1-sol-pro",
     "claude": "opus",
-    "codex": "gpt-6.1-sol-pro",
+    "codex": {
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "low"
+    },
     "antigravity": "gemini-3.1-pro-high"
   },
   "architect": {
     "opencode": "gpt-6.1-sol",
     "claude": "opus",
-    "codex": "gpt-6.1-sol",
+    "codex": {
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "low"
+    },
     "antigravity": "gemini-3.1-pro-high"
   },
   "refactor-planner": {
     "opencode": "gpt-6.1-sol",
     "claude": "opus",
-    "codex": "gpt-6.1-sol",
+    "codex": {
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "low"
+    },
     "antigravity": "gemini-3.1-pro-high"
   },
   "researcher": {
@@ -41,13 +56,19 @@
   "debugger": {
     "opencode": "gpt-6.1-sol",
     "claude": "sonnet",
-    "codex": "gpt-6.1-sol",
+    "codex": {
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "low"
+    },
     "antigravity": "gemini-3.1-pro-high"
   },
   "tester": {
     "opencode": "gpt-6.1-terra",
     "claude": "sonnet",
-    "codex": "gpt-6.1-terra",
+    "codex": {
+      "model": "gpt-6.1-terra",
+      "reasoning_effort": "low"
+    },
     "antigravity": "gemini-3.6-flash-high"
   },
   "docs-writer": {

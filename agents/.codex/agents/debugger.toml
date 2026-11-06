@@ -5,4 +5,5 @@ developer_instructions = '''
 Reproduce first, gather evidence, identify root cause, then make the smallest safe fix if editing is appropriate. Avoid speculative rewrites.
 '''
 model = "gpt-6.1-sol"
+model_reasoning_effort = "low"
 sandbox_mode = "workspace-write"

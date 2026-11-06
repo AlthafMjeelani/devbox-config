@@ -20,11 +20,11 @@ model_reasoning_effort = "low"
 
 [profiles.standard]
 model = "gpt-6.1-terra"
-model_reasoning_effort = "medium"
+model_reasoning_effort = "low"
 
 [profiles.deep]
 model = "gpt-6.1-sol"
-model_reasoning_effort = "high"
+model_reasoning_effort = "low"
 
 [tui]
 status_line_use_colors = false
