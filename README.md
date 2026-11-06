@@ -19,7 +19,7 @@ Files in `$HOME` become symlinks into this repo, so editing a config edits the r
 | `zsh/`, `zshenv/`, `zprofile/`, `starship/` | Shell, aliases, PATH exports, prompt, sessionizers |
 | `alacritty/`, `ghostty/`, `kitty/`, `wezterm/` | Terminal emulators |
 | `git/`, `lazygit/`, `.vscode/` | Git config, Lazygit (`Ctrl+a` runs an AI commit), VS Code settings |
-| `swiftbar/` | macOS menu bar widget showing AI quota and reset timers |
+| `swiftbar/` | macOS menu bar: system monitor (CPU, RAM, disk, battery, network) and AI quota/reset timers |
 | `scripts/` | CLI tools in `~/.local/bin` (`ai-usage`, `agents-sync`, `crew`, `gate`, `git-wt`, ...) |
 | `docs/`, `tests/` | Docs and workflow tests |
 
