@@ -113,3 +113,8 @@ Do not commit or push unless requested.
 - `web-motion-and-microinteractions` - Framer Motion, scroll animation, bento, glass
 - `print-and-publication-documents` - Typst/LaTeX/WeasyPrint invoices, brochures, reports
 - `admin-panel-dashboard-design` - admin panels, dashboards and control centers with modern look and feel
+
+## Agent workflow skills
+- `agent-orchestration` - split goals into tasks, dispatch workers in worktrees, review and merge
+- `agent-communication` - handoff files, status signals, terminal messaging, ask-or-decide rules
+- `rex-terminal` - drive the Rex terminal from an agent (`rex run --wait`, send, capture, status, events)

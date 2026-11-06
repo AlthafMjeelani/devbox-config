@@ -14,7 +14,7 @@ const pack = [
   "senior-backend-engineer", "auth-and-identity", "fullstack-type-safety", "react-state-and-query",
   "flutter-native-and-release", "flutter-ui-ux-design", "poster-and-social-media-design",
   "svg-logo-and-icon-design", "web-motion-and-microinteractions", "print-and-publication-documents",
-  "admin-panel-dashboard-design",
+  "admin-panel-dashboard-design", "rex-terminal", "agent-orchestration", "agent-communication",
   ...upstream.map((skill) => skill.name),
 ];
 

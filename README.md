@@ -25,18 +25,42 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 | Remove a part | `make unstow PKG="nvim"` |
 | Also set up the zsh config | `./setup.sh --shell` |
 | See usage and quota for every agent | `ai-usage` (or the menu bar) |
+| Run parallel agents in worktrees | `crew new "<task>" --claude` (see `agent-orchestration`) |
+| Run and message agents in Rex | `rex-agents spawn <name> -C <dir> -- claude`, `rex-agents send <name> "..."` |
 | Edit a config | change the file in `$HOME` (it is a symlink), then `git commit` here |
 
 ## What you get
 
-**One skill set for every agent.** All 117 skills live in `agents/.config/opencode/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
+**One skill set for every agent.** All 120 skills live in `agents/.config/opencode/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
 
 **A macOS menu bar** (SwiftBar) with two plugins:
 
 - *System monitor*: CPU, RAM, disk, battery and network at a glance, turning orange or red only when something needs attention.
 - *AI usage*: quota left, reset timers and a burn-rate forecast per agent, with alerts and per-agent icons. Details in [`swiftbar/README.md`](swiftbar/README.md).
 
+**Rex terminal support** (Superlogical Rex): keybindings in `rex/.config/rex/init.lua` (tmux-style `ctrl+q` prefix), plus `rex-agents` to start agents, message them, read their screens and get notified when one finishes or needs you. See [Using Rex](#using-rex).
+
 **Dev tools in `~/.local/bin`**: `ai-usage`, `agents-sync`, `crew` (multi-agent tmux orchestrator), `gate` (local ship gate), `git-wt` (worktrees), `ai-account`, `agent-icons` and more. See [`scripts/README.md`](scripts/README.md).
+
+## Using Rex
+
+Rex is Superlogical's terminal with persistent sessions and a scriptable CLI. `./setup.sh` links `~/.config/rex/init.lua` and, if Rex is installed, validates and reloads it.
+
+**Keys** (prefix `ctrl+q`, then): `c` new tab, `n`/`p` next/previous tab, `,` rename, `v` split right, `-` split down, `z` zoom, `x` close pane, `=` balance, `s` switch session. Press `ctrl+q` twice to send a literal `ctrl+q`. List them with `rex keymap`.
+
+**Agents in Rex**
+
+```sh
+rex-agents spawn api -C ~/code/app-api -- claude     # one agent = one session
+rex-agents send api "Read TASK.md and start"         # type a message and press Enter
+rex-agents read api                                  # see its screen
+rex-agents watch                                     # macOS notification when an agent finishes or is blocked
+rex-agents kill api
+```
+
+Three skills teach your agents the workflow: `agent-orchestration` (plan, dispatch, review, merge), `agent-communication` (handoff files, status signals, ask-or-decide) and `rex-terminal` (the `rex` CLI). They load in all seven agents. To also install Rex's own skill and hook for Claude Code, run `rex skill setup --agent claude`.
+
+If Rex says the CLI is not allowed, turn on Remote Control in Rex settings. `rex config check` validates `init.lua`; a binding that Rex rejects can simply be deleted, because Rex works with no config.
 
 ## What is inside
 
@@ -49,6 +73,7 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 | `zsh/`, `zshenv/`, `zprofile/`, `starship/` | Shell, aliases, PATH exports, prompt, sessionizers |
 | `alacritty/`, `ghostty/`, `kitty/`, `wezterm/` | Terminal emulators |
 | `git/`, `lazygit/`, `.vscode/` | Git config, Lazygit (`Ctrl+a` runs an AI commit), VS Code settings |
+| `rex/` | Rex terminal config (`init.lua`) |
 | `swiftbar/` | macOS menu bar plugins |
 | `scripts/` | CLI tools |
 | `docs/`, `tests/` | Docs and workflow tests |

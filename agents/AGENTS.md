@@ -72,3 +72,7 @@ When running under Kimi Code or Google Antigravity, compose shared skills with n
 <!-- postman-cli:installation:start -->
 Postman CLI is installed on this device, and can be used for API Engineering work.
 <!-- postman-cli:installation:end -->
+
+## Multi-agent work
+- For parallel or multi-step agent work, follow `agent-orchestration`; for handoffs and messages between agents, follow `agent-communication`.
+- Inside a Rex terminal (`REX_SESSION` is set), use `rex-terminal` and `rex-agents` to run, message and monitor other agents.

@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# rex-agents - run and talk to coding agents through Rex (Superlogical's terminal). One agent = one Rex session.
+#
+#   rex-agents spawn <name> [-C dir] -- <command...>   Start an agent (or any command) in a new session.
+#   rex-agents ls                                      List sessions.
+#   rex-agents send <name> <text...> [-b block]        Type a message into an agent and press Enter.
+#   rex-agents key  <name> <key...> [-b block]         Send keys (enter, esc, down, ctrl+c ...).
+#   rex-agents read <name> [-b block]                  Print the agent's screen (trimmed).
+#   rex-agents status <block>                          Print an agent's reported state (idle/working/done/blocked/error).
+#   rex-agents watch                                   Notify (macOS) when an agent finishes or needs you.
+#   rex-agents kill <name>                             End the session.
+#
+# Uses only documented rex commands: new, ls, send, send-key, capture, block call, events, session kill.
+# REX_BIN overrides the rex binary. Inside a Rex terminal `rex` is already on PATH.
+set -euo pipefail
+
+die() { printf 'rex-agents: %s\n' "$*" >&2; exit 1; }
+
+REX="${REX_BIN:-}"
+if [ -z "$REX" ]; then
+  if command -v rex >/dev/null 2>&1; then REX=rex
+  elif [ -x "/Applications/Rex Beta.app/Contents/Helpers/Rex Server.rex/Contents/MacOS/rex" ]; then
+    REX="/Applications/Rex Beta.app/Contents/Helpers/Rex Server.rex/Contents/MacOS/rex"
+  elif [ -x "/Applications/Rex.app/Contents/Helpers/Rex Server.rex/Contents/MacOS/rex" ]; then
+    REX="/Applications/Rex.app/Contents/Helpers/Rex Server.rex/Contents/MacOS/rex"
+  else die "rex not found. Open Rex once, or set REX_BIN to the rex binary."; fi
+fi
+
+usage() { sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+
+# Split "-b <block>" off the end of the arguments.
+BLOCK=""
+take_block() {
+  ARGS=()
+  while [ $# -gt 0 ]; do
+    if [ "$1" = "-b" ]; then BLOCK="${2:-}"; [ -n "$BLOCK" ] || die "-b needs a block"; shift 2
+    else ARGS+=("$1"); shift; fi
+  done
+}
+target() { local t=(-s "$1"); [ -n "$BLOCK" ] && t+=(-b "$BLOCK"); printf '%s\n' "${t[@]}"; }
+
+cmd="${1:-}"; [ $# -gt 0 ] && shift
+case "$cmd" in
+  spawn)
+    [ $# -ge 1 ] || usage 2
+    name="$1"; shift; dir=""
+    if [ "${1:-}" = "-C" ]; then dir="${2:-}"; [ -d "$dir" ] || die "no such directory: $dir"; shift 2; fi
+    [ "${1:-}" = "--" ] && shift
+    [ $# -ge 1 ] || die "give a command after --"
+    if [ -n "$dir" ]; then
+      quoted="$(printf '%q ' "$@")"
+      exec "$REX" new "$name" -- bash -lc "cd $(printf '%q' "$dir") && exec $quoted"
+    fi
+    exec "$REX" new "$name" -- "$@"
+    ;;
+  ls) exec "$REX" ls ;;
+  send)
+    [ $# -ge 2 ] || usage 2
+    name="$1"; shift; take_block "$@"; [ ${#ARGS[@]} -ge 1 ] || die "nothing to send"
+    mapfile -t T < <(target "$name")
+    # Newlines would submit the prompt early, so fold them into spaces; long text belongs in a file.
+    text="$(printf '%s ' "${ARGS[@]}" | tr '\n' ' ' | sed 's/ *$//')"
+    "$REX" send "${T[@]}" "$text"
+    "$REX" send-key "${T[@]}" enter
+    ;;
+  key)
+    [ $# -ge 2 ] || usage 2
+    name="$1"; shift; take_block "$@"; mapfile -t T < <(target "$name")
+    exec "$REX" send-key "${T[@]}" "${ARGS[@]}"
+    ;;
+  read)
+    [ $# -ge 1 ] || usage 2
+    name="$1"; shift; take_block "$@"; mapfile -t T < <(target "$name")
+    exec "$REX" capture "${T[@]}" --trim
+    ;;
+  status)
+    [ $# -eq 1 ] || usage 2
+    exec "$REX" block call -b "$1" program_status
+    ;;
+  watch)
+    printf 'rex-agents: watching for finished or blocked agents (Ctrl+C to stop)\n' >&2
+    "$REX" events --json | while IFS= read -r line; do
+      case "$line" in *program_status_changed*) ;; *) continue ;; esac
+      state=""
+      for s in blocked done error; do case "$line" in *"\"$s\""*) state="$s"; break ;; esac; done
+      [ -n "$state" ] || continue
+      printf '%s agent %s\n' "$(date +%H:%M:%S)" "$state"
+      if command -v osascript >/dev/null 2>&1; then
+        osascript -e "display notification \"An agent is $state\" with title \"Rex\"" >/dev/null 2>&1 || true
+      fi
+    done
+    ;;
+  kill)
+    [ $# -eq 1 ] || usage 2
+    exec "$REX" session kill "$1"
+    ;;
+  -h|--help|help|"") usage 0 ;;
+  *) usage 2 ;;
+esac

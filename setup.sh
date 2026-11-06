@@ -136,6 +136,25 @@ run make agents-sync
 run make stow PKG="$PKGS"
 [ "$DRY" = 0 ] && ok "Linked: $PKGS"
 
+# ---- 3b. Rex terminal ------------------------------------------------------------------------
+if printf '%s' " $PKGS " | grep -q ' rex '; then
+  step "3b Rex terminal"
+  REXBIN=""
+  for c in "$(command -v rex 2>/dev/null || true)" "/Applications/Rex Beta.app/Contents/Helpers/Rex Server.rex/Contents/MacOS/rex" "/Applications/Rex.app/Contents/Helpers/Rex Server.rex/Contents/MacOS/rex"; do
+    [ -n "$c" ] && [ -x "$c" ] && { REXBIN="$c"; break; }
+  done
+  if [ -z "$REXBIN" ]; then
+    ok "Rex not found (config is linked at ~/.config/rex/init.lua and applies once Rex is installed)"
+  elif [ "$DRY" = 1 ]; then
+    run "$REXBIN" config check
+  elif "$REXBIN" config check >/tmp/devbox-rex-check.log 2>&1; then
+    "$REXBIN" config reload >/dev/null 2>&1 || true
+    ok "Rex config valid and reloaded"
+  else
+    warn "rex config check failed, see /tmp/devbox-rex-check.log (edit ~/.config/rex/init.lua; Rex works without it)"
+  fi
+fi
+
 # ---- 4. codex config -------------------------------------------------------------------------
 step "4/6 Codex config"
 if [ -e "$HOME/.codex/config.toml" ]; then
