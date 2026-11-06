@@ -198,7 +198,7 @@ if [ "$DRY" = 1 ]; then
   ok "Dry run finished. Re-run without --dry-run to apply."
   exit 0
 fi
-skills_src="agents/.config/opencode/skills"
+skills_src="agents/skills"
 total="$(find "$skills_src" -mindepth 1 -maxdepth 1 -type d ! -name '.*' | wc -l | tr -d ' ')"
 for dir in "$HOME/.claude/skills" "$HOME/.agents/skills" "$HOME/.config/opencode/skills"; do
   if [ -d "$dir" ]; then

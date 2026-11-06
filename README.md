@@ -20,7 +20,7 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 |---|---|
 | Update this machine | `git pull && ./setup.sh -y` |
 | Check everything is healthy | `make verify-agent-workflow` |
-| Add or change a skill | edit `agents/.config/opencode/skills/<name>/SKILL.md`, then `make agents-sync && make restow` |
+| Add or change a skill | edit `agents/skills/<name>/SKILL.md`, then `make agents-sync && make restow` |
 | Install only some parts | `make stow PKG="agents opencode nvim"` |
 | Remove a part | `make unstow PKG="nvim"` |
 | Also set up the zsh config | `./setup.sh --shell` |
@@ -31,7 +31,7 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 
 ## What you get
 
-**One skill set for every agent.** All 120 skills live in `agents/.config/opencode/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
+**One skill set for every agent.** All 120 skills live in `agents/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
 
 **A macOS menu bar** (SwiftBar) with two plugins:
 
@@ -100,7 +100,7 @@ Full catalog: [`docs/DESIGN-SKILLS.md`](docs/DESIGN-SKILLS.md).
 
 ### Add your own skill
 
-1. Create `agents/.config/opencode/skills/<name>/SKILL.md`:
+1. Create `agents/skills/<name>/SKILL.md`:
    ```md
    ---
    name: <name>          # must equal the folder name

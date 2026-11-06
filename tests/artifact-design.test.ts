@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 const repo = resolve(import.meta.dir, "..");
-const skills = resolve(repo, "agents/.config/opencode/skills");
+const skills = resolve(repo, "agents/skills");
 const upstream = JSON.parse(readFileSync(resolve(repo, "agents/design-skills.sources.json"), "utf8")).skills as { name: string; revision: string; repository: string; path: string }[];
 const pack = [
   "professional-artifact-design", "content-storytelling", "data-visualization",

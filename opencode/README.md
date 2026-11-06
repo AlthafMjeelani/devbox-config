@@ -357,7 +357,7 @@ OAuth/auth state is created per machine and is not synced through Git.
 
 ## Skills
 
-> Skills are owned by the **`agents/`** stow package (`agents/.config/opencode/skills/`) and
+> Skills are owned by the **`agents/`** stow package (`agents/skills/`) and
 > shared across OpenCode, Claude, Codex, Kimi Code, Amp, and CommandCode - the same `SKILL.md` set
 > for all six. See `agents/README.md`. The list below documents the shared set; it is not
 > installed by this `opencode/` package.
@@ -372,7 +372,7 @@ systematic-debugging       from obra/superpowers
 test-driven-development    from obra/superpowers
 ```
 
-These are trimmed copies, not a live install from npm or `skills add`. They are stored in `agents/.config/opencode/skills/` so Stow can manage them deterministically.
+These are trimmed copies, not a live install from npm or `skills add`. They are stored in `agents/skills/` so Stow can manage them deterministically.
 
 Local fallback skills:
 

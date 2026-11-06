@@ -157,7 +157,7 @@ function resetManagedEntries(directory: string, manifestName: string, current: s
 }
 
 function syncSkills(directory: string) {
-  const sourceRoot = path.join(repo, "agents", ".config", "opencode", "skills");
+  const sourceRoot = path.join(repo, "agents", "skills");
   const names = fs.readdirSync(sourceRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && !entry.name.startsWith(".") && !LOCAL_ONLY_SKILLS.has(entry.name))
     .map((entry) => entry.name)

@@ -43,7 +43,7 @@ describe("shared skill installation", () => {
       });
       expect(result.exitCode, result.stderr.toString()).toBe(0);
       expect(readlinkSync(resolve(home, ".agents/skills/code-review"))).toContain(
-        "agents/.config/opencode/skills/code-review",
+        "agents/skills/code-review",
       );
       expect(existsSync(thirdParty)).toBe(true);
       expect(existsSync(resolve(home, ".agents/skills/.system"))).toBe(false);

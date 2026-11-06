@@ -17,7 +17,7 @@ function run(command: string[], optional = false) {
   return result.exitCode === 0;
 }
 
-const skillsRoot = join(repo, "agents/.config/opencode/skills");
+const skillsRoot = join(repo, "agents/skills");
 const names = new Set<string>();
 for (const directory of readdirSync(skillsRoot, { withFileTypes: true }).filter(
   (entry) => entry.isDirectory() && !entry.name.startsWith("."),

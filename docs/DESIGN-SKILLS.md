@@ -1,6 +1,6 @@
 # Shared design and document skills
 
-The canonical packages live in `agents/.config/opencode/skills/`.
+The canonical packages live in `agents/skills/`.
 They are available through the existing Stow and `agents-sync` setup to Claude Code, Codex, OpenCode, Kimi Code, Amp, CommandCode and Google Antigravity.
 Skill discovery does not install the external services or rendering tools mentioned in a package.
 

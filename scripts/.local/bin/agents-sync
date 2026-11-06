@@ -136,7 +136,7 @@ const models = JSON.parse(fs.readFileSync(modelsPath, "utf8")) as ModelMap;
 const sourceDir = path.join(repo, "opencode", ".config", "opencode", "agents");
 const claudeDir = path.join(repo, "agents", ".claude", "agents");
 const codexDir = path.join(repo, "agents", ".codex", "agents");
-const sharedSkillsDir = path.join(repo, "agents", ".config", "opencode", "skills");
+const sharedSkillsDir = path.join(repo, "agents", "skills");
 
 ensureDir(claudeDir);
 ensureDir(codexDir);

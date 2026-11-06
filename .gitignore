@@ -52,4 +52,4 @@ opencode/.opencode/bun.lock*
 /.commandcode/taste
 
 # Claude desktop account-synced skills (account-specific)
-agents/.config/opencode/skills/synced/
+agents/skills/synced/

@@ -30,17 +30,17 @@ agents/AGENTS.md                       <- the real file
 ## Shared Skills
 
 Skills use the portable format all seven tools support (`SKILL.md` = `name` + `description` +
-markdown). The canonical set lives at `agents/.config/opencode/skills/`.
-Claude, Kimi Code, CommandCode, and Google Antigravity symlink their whole skills dir to it, Codex gets per-skill directory links under its shared user directory, and Amp discovers the Claude path:
+markdown). The canonical set lives at `agents/skills/`.
+Every tool gets a symlink to it, so there is one copy and no per-tool duplicates. The folder sits at `agents/skills/` (not inside any tool's folder) and is excluded from Stow by `.stow-local-ignore`; each tool's own `skills` entry in this package is a relative symlink to it. Codex gets per-skill directory links under its shared user directory, and Amp discovers the Claude path:
 
 ```text
-agents/.config/opencode/skills/        <- canonical SKILL.md set (real files)
-  ~/.config/opencode/skills/           (OpenCode - real dir of per-file symlinks)
-  ~/.claude/skills  -> ~/.config/opencode/skills  (Claude Code)
-  ~/.agents/skills/<name> -> canonical skill dirs (Codex - alongside third-party skills)
-  ~/.kimi-code/skills -> ~/.config/opencode/skills (Kimi Code)
-  ~/.commandcode/skills -> ~/.config/opencode/skills (CommandCode)
-  ~/.gemini/antigravity-cli/skills -> ~/.config/opencode/skills (Google Antigravity)
+agents/skills/                          <- canonical SKILL.md set (real files, the only copy)
+  ~/.claude/skills                      -> agents/skills  (Claude Code)
+  ~/.config/opencode/skills             -> agents/skills  (OpenCode)
+  ~/.kimi-code/skills                   -> agents/skills  (Kimi Code)
+  ~/.commandcode/skills                 -> agents/skills  (CommandCode)
+  ~/.gemini/antigravity-cli/skills      -> agents/skills  (Google Antigravity)
+  ~/.agents/skills/<name>               -> agents/skills/<name>  (Codex - alongside third-party skills)
   Amp discovers ~/.claude/skills
 ```
 
@@ -186,6 +186,6 @@ ls ~/.claude/skills ~/.config/opencode/skills | sort -u | head                  
 
 - The OpenCode `opencode/` package owns `~/.config/opencode/opencode.json`, `tui.json`,
   `agents/`, `commands/`, `themes/`. This package owns `~/.config/opencode/AGENTS.md` and
-  `~/.config/opencode/skills/`, so there is no stow conflict.
+  `~/.config/opencode/skills` (a symlink to `agents/skills`), so there is no stow conflict.
 - The `amp/` package owns `~/.config/amp/settings.json`, Amp-specific guidance, checks, and plugins.
 - Keep `AGENTS.md` short - it loads into every agent's context on every session.
