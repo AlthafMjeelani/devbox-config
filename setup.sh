@@ -223,6 +223,10 @@ for dir in "$HOME/.claude/skills" "$HOME/.agents/skills" "$HOME/.config/opencode
   else
     warn "$dir is missing"
   fi
+  if [ -d "$dir" ]; then
+    dangling="$(find "$dir" -maxdepth 2 -type l ! -exec test -e {} \; -print 2>/dev/null | wc -l | tr -d ' ')"
+    [ "$dangling" -gt 0 ] && warn "$dir: $dangling dangling symlinks (remove: find $dir -maxdepth 1 -type l ! -exec test -e {} \\; -delete)"
+  fi
 done
 if make verify-agent-workflow >/tmp/devbox-verify.log 2>&1; then ok "make verify-agent-workflow passed"; else warn "verify-agent-workflow reported problems, see /tmp/devbox-verify.log"; fi
 if [ "$PLATFORM" = linux ]; then ok "AI usage in your bar: see docs/LINUX-STATUSBAR.md (waybar, tmux: ai-usage-bar)"; fi
