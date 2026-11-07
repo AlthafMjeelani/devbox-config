@@ -55,7 +55,7 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 
 Rex is Superlogical's terminal with persistent sessions and a scriptable CLI. `./setup.sh` links `~/.config/rex/init.lua` and, if Rex is installed, validates and reloads it.
 
-**Keys** (prefix `ctrl+q`, then): `c` new tab, `n`/`p` next/previous tab, `,` rename, `v` split right, `-` split down, `z` zoom, `x` close pane, `=` balance, `s` switch session. Press `ctrl+q` twice to send a literal `ctrl+q`. List them with `rex keymap`.
+**Keys** (prefix `ctrl+q`, then): `c` new tab, `n`/`p` next/previous tab, `,` rename, `w` close tab, `r` rename session, `[`/`]` previous/next session, `v` split right, `-` split down, `z` zoom, `x` close pane, `=` balance, `s` switch session. Press `ctrl+q` twice to send a literal `ctrl+q`. List them with `rex keymap`.
 
 **Agents in Rex**
 
