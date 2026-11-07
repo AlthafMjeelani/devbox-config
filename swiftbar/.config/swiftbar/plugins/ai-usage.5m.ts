@@ -129,7 +129,7 @@ const tableRows = sortedPools.map((pool) => {
   const st = statusWord(pool);
   return { name: nameOf(pool), nameColor: "#F2F2F7", five: cellOf(five ?? single), seven: cellOf(seven), status: st.text, statusColor: st.sev ? SEV_COLOR[st.sev] : GRAY };
 });
-if (tableRows.length) console.log(`| image=${renderTable({ connected: live.length, attention: attentionCount, rows: tableRows })}`);
+if (tableRows.length) console.log(` | image=${renderTable({ connected: live.length, attention: attentionCount, rows: tableRows })}`);
 console.log("---");
 for (const pool of sortedPools) {
   console.log(`${nameOf(pool)}  ·  details | size=12 color=${GRAY}`);
@@ -154,23 +154,25 @@ for (const pool of sortedPools) {
 }
 if (sortedPools.length) console.log("---");
 
-if (infoPools.length) {
-  console.log(`CONNECTED · NO QUOTA DATA | color=${GRAY} size=11`);
-  for (const pool of infoPools) {
-    const detail = clean(pool.rows[0]?.note ?? "connected");
-    const who = pool.account !== "default" ? `  ·  ${clean(pool.account.replace(/\s*\(.*$/, ""))}` : "";
-    console.log(`${glyphOf(pool.agent)} ${poolName(pool)}${who}  ·  ${detail} | size=12 color=${GRAY}`);
-  }
-  console.log("---");
-}
-
 if (offline.length) {
-  console.log(`NEEDS LOGIN | color=${ORANGE} size=11`);
+  console.log(`NEEDS LOGIN | color=${RED} size=11`);
   for (const pool of offline) {
     const reason = clean(pool.rows[0]?.note ?? "no data");
     const fix = /rate limited/.test(reason) ? undefined : LOGIN[pool.agent];
     const action = fix ? ` shell=/bin/zsh param1=-lc param2='${fix}' terminal=true` : "";
-    console.log(`${glyphOf(pool.agent)} ${pool.agent}  ·  ${reason}${fix ? `   (click: ${fix})` : ""} | sfimage=exclamationmark.circle sfcolor=${ORANGE} color=${GRAY} size=12${action}`);
+    console.log(`${pool.agent}  -  ${reason}${fix ? "     🔑 Login" : ""} | sfimage=chevron.right sfcolor=${RED} size=13${action}`);
+  }
+  console.log("---");
+}
+
+if (infoPools.length) {
+  console.log("Connected Services | size=13");
+  for (const pool of infoPools) {
+    const who = pool.account !== "default" ? clean(pool.account.replace(/\s*\(.*$/, "")) : "";
+    const detail = clean(pool.rows[0]?.note ?? "connected");
+    const credits = detail.match(/\$[\d.,]+\s*left/i)?.[0];
+    if (who) console.log(`${who} | sfimage=envelope size=13`);
+    console.log(`${credits ? `Credits: ${credits}` : `${poolName(pool)}  ·  ${detail}`} | sfimage=creditcard color=${GRAY} size=13`);
   }
   console.log("---");
 }

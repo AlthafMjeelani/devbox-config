@@ -24,7 +24,7 @@ export function renderTable(t: Table): string {
   textC("semi26", `${t.attention} Needing Attention`, x1 + 32, 44);
   c.roundRect(16 * S, 62 * S, (W - 32) * S, 1 * S, 0, LINE);
 
-  const colName = 16, col5 = 154, col7 = 238, colSt = 322, barW = 40, barH = 6;
+  const colName = 16, col5 = 150, col7 = 230, colSt = 316, barW = 36, barH = 6;
   textC("reg22", "Agent", colName, 78, GRAY);
   textC("reg22", "5h Limit", col5, 78, GRAY);
   textC("reg22", "7d Limit", col7, 78, GRAY);
@@ -39,6 +39,16 @@ export function renderTable(t: Table): string {
     textC("semi26", `${Math.round(cell.left)}%`, x + barW + 6, cy, col);
   };
 
+  // A small flame: orange teardrop with a yellow core, built from stacked circles.
+  const flame = (x: number, cy: number) => {
+    const teardrop = (r: number, col: string, dy: number) => {
+      c.circle((x + 5) * S, (cy + 2 + dy) * S, r * S, rgb(col));
+      for (let k = 1; k <= 6; k++) c.circle((x + 5) * S, (cy + 2 + dy - k * 1.3) * S, Math.max(0.6, r * (1 - k / 6.5)) * S, rgb(col));
+    };
+    teardrop(4, "#FF6A00", 0);
+    teardrop(2, "#FFD60A", 1);
+  };
+
   t.rows.forEach((r, i) => {
     const cy = top + i * rowsH + rowsH / 2 - 4;
     let name = r.name;
@@ -46,7 +56,8 @@ export function renderTable(t: Table): string {
     textC("semi26", name, colName, cy, rgb(r.nameColor));
     bar(col5, cy, r.five);
     bar(col7, cy, r.seven);
-    textC("semi22", r.status, colSt, cy, rgb(r.statusColor));
+    const sx = textC("semi22", r.status, colSt, cy, rgb(r.statusColor)) / S;
+    if (r.status === "HIGH BURN") flame(sx + 4, cy);
   });
   return c.png().toString("base64");
 }
