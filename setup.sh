@@ -201,7 +201,14 @@ else
   fi
   if [ -d /Applications/SwiftBar.app ]; then
     run osascript -e 'tell application "SwiftBar" to quit' 2>/dev/null || true
-    run open -a SwiftBar
+    if [ "$DRY" = 0 ]; then
+      # Quit is async: opening while the old process is still exiting fails with LaunchServices error -600.
+      for _ in 1 2 3 4 5 6 7 8 9 10; do pgrep -x SwiftBar >/dev/null || break; sleep 0.5; done
+      for _ in 1 2 3; do open -a SwiftBar 2>/dev/null && break; sleep 1; done
+      pgrep -x SwiftBar >/dev/null || warn "SwiftBar did not start; open it from /Applications."
+    else
+      run open -a SwiftBar
+    fi
     ok "SwiftBar pointed at $PLUGINS (system-monitor + ai-usage)"
   else
     warn "SwiftBar is not installed: brew install --cask swiftbar, then re-run ./setup.sh"
