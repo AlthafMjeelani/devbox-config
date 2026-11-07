@@ -212,18 +212,29 @@ export const miniMeter = (used: number | null, cells = 5): string => {
   const f = used === null ? 0 : Math.max(used > 0 ? 1 : 0, Math.round((Math.min(100, used) / 100) * cells));
   return "▰".repeat(f) + "▱".repeat(cells - f);
 };
-export const usedSeverity = (used: number | null): Sev | null => (used === null ? null : used >= 90 ? "crit" : used >= 75 ? "warn" : "ok");
-
-export type BarMeter = { agent: string; used: number | null; sev: Sev | null; meter: string };
-export function barMeters(pools: Pool[]): BarMeter[] {
+export type BarMeter = { agent: string; left: number | null; sev: Sev | null; meter: string };
+// Values are "% left", the same number the dropdown shows, so header and menu never disagree.
+export function barMeters(pools: Pool[], now = Date.now()): BarMeter[] {
   const out: BarMeter[] = [];
   for (const agent of ["Claude", "Codex"]) {
     const mine = pools.filter((p) => p.agent === agent && connected(p));
     if (!mine.length) continue;
     const rows = mine.flatMap((p) => p.rows).filter((r) => r.used !== null);
     const session = rows.find((r) => r.limit === "5h") ?? rows[0];
-    const used = session ? session.used : null;
-    out.push({ agent, used, sev: usedSeverity(used), meter: miniMeter(used) });
+    const left = session ? leftOf(session) : null;
+    out.push({ agent, left, sev: severity(left, breaches(session, now)), meter: miniMeter(left) });
   }
   return out;
+}
+
+// Short status word for a pool, as in the dropdown table.
+export function statusWord(pool: Pool, now = Date.now()): { text: string; sev: Sev | null } {
+  if (pool.status === "blocked") return { text: "LIMIT", sev: "crit" };
+  const sev = poolSeverity(pool, now);
+  if (sev === "crit") return { text: "CRITICAL", sev };
+  if (sev === "warn") {
+    const left = worstRow(pool.rows) ? leftOf(worstRow(pool.rows)!) : pool.left;
+    return { text: pool.rows.some((r) => breaches(r, now)) && (left ?? 0) > LOW ? "HIGH BURN" : "LOW", sev };
+  }
+  return { text: sev === "ok" ? "OPTIMAL" : "--", sev };
 }

@@ -31,7 +31,7 @@ describe("ai-usage-bar", () => {
   test("plain text puts the agent needing attention first", () => {
     const { out, code } = run(data);
     expect(code).toBe(0);
-    expect(out.startsWith("✺ ▰▰▰▰▰  ⌘ ▰▱▱▱▱")).toBe(true);
+    expect(out.startsWith("✺ ▰▱▱▱▱  ⌘ ▰▰▰▰▱")).toBe(true);
     expect(out).not.toContain("Amp");
   });
 

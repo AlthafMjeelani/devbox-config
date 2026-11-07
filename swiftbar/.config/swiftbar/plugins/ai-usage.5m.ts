@@ -13,7 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   GRAY, ORANGE, RED, SEV_COLOR, glyphOf, symbolOf, breaches, connected, diffAlerts, forecast, hasQuota, leftOf, pickBest, poolSeverities, poolSeverity,
-  barMeters, summarizeAgents, paceBar, elapsedOf, detailText, until, worstRow, type Pool, type Row, type Sev,
+  barMeters, statusWord, severity, summarizeAgents, paceBar, elapsedOf, detailText, until, worstRow, type Pool, type Row, type Sev,
 } from "../lib/aiusage.ts";
 
 const bin = path.join(os.homedir(), ".local/bin");
@@ -97,7 +97,7 @@ const blockedAll = pools.length > 0 && !best && pools.some((p) => p.status === "
 const summaries = summarizeAgents(pools);
 const meters = barMeters(pools);
 if (meters.length) {
-  const png = renderBar(meters.map((m) => ({ used: m.used, label: m.agent === "Claude" ? "CL" : "CX", color: m.sev === "crit" ? RED : m.sev === "warn" ? ORANGE : brand(m.agent) })));
+  const png = renderBar(meters.map((m) => ({ used: m.left, label: m.agent === "Claude" ? "CL" : "CX", color: m.sev === "crit" ? RED : m.sev === "warn" ? ORANGE : brand(m.agent) })));
   console.log(`${staleSince ? "⟳" : ""} | image=${png}`);
 } else {
   console.log(`AI -- | sfimage=gauge.with.dots.needle.0percent color=${blockedAll ? RED : GRAY}`);
@@ -106,14 +106,8 @@ if (meters.length) {
 // ---- dropdown ----
 console.log("---");
 const attentionCount = summaries.filter((s) => s.sev === "crit" || s.sev === "warn").length;
-console.log(`AI USAGE  ·  ${live.length} connected${attentionCount ? `  ·  ${attentionCount} need attention` : ""} | color=${GRAY} size=11`);
+console.log(`${paint(SEV_COLOR.ok, "●")} ${live.length} connected     ${paint(attentionCount ? ORANGE : GRAY, "●")} ${attentionCount} need attention | ansi=true font=Menlo size=12`);
 if (staleSince) console.log(`⚠ Showing data from ${until(Date.now() + (Date.now() - staleSince))} ago (${failure}) | color=${ORANGE} size=11`);
-if (best) {
-  const reset = best.nextResetAt ? `  ·  resets in ${until(best.nextResetAt)}` : "";
-  console.log(`Use first: ${best.agent}  ·  ${Math.round(best.left ?? 0)}% left${reset} | color=${brand(best.agent)} size=13 ${iconParams(best.agent)}`);
-} else if (blockedAll) {
-  console.log(`All limits reached | color=${RED} size=13 sfimage=exclamationmark.octagon.fill sfcolor=${RED}`);
-}
 console.log("---");
 
 const SEV_ORDER: Record<string, number> = { crit: 0, warn: 1, ok: 2 };
@@ -121,25 +115,26 @@ const sortedPools = [...quotaPools].sort(
   (a, b) => (SEV_ORDER[poolSeverity(a) ?? "ok"] ?? 2) - (SEV_ORDER[poolSeverity(b) ?? "ok"] ?? 2) || (a.left ?? 101) - (b.left ?? 101),
 );
 
-// Thin continuous bar; one color per line so it stays visible in any theme.
-const meter = (left: number | null, width = 28) => {
-  const filled = left === null ? 0 : Math.round((Math.max(0, Math.min(100, left)) / 100) * width);
-  return "━".repeat(filled) + "─".repeat(width - filled);
-};
-const icon = (sev: Sev | null) => (sev === null ? "questionmark.circle" : sev === "crit" ? "xmark.octagon.fill" : sev === "warn" ? "exclamationmark.triangle.fill" : "checkmark.circle.fill");
-
-for (const pool of sortedPools) {
-  const sev = poolSeverity(pool);
+// Table: Agent | 5h limit | 7d limit | Status. Bars show what is LEFT, colored by how worried to be.
+const BAR = 8;
+const cell = (row: Row | undefined) => {
+  if (!row || row.used === null) return paint(GRAY, "░".repeat(BAR) + "   --");
+  const left = Math.max(0, Math.min(100, 100 - row.used));
+  const sev = severity(left, breaches(row));
   const hex = sev ? SEV_COLOR[sev] : GRAY;
-  const w = worstRow(pool.rows);
-  const left = w ? leftOf(w) : pool.left;
-  const burning = pool.rows.some((r) => breaches(r));
-  const badge = pool.status === "blocked" ? "  LIMIT" : sev === "crit" ? "  CRITICAL" : sev === "warn" ? (burning && (left ?? 0) > 30 ? "  HIGH BURN" : "  LOW") : "";
-  const win = w && w.limit !== "-" ? w.limit : "";
-  const reset = w?.resetAt ? `↻${until(w.resetAt)}` : "";
-  const pct = left === null ? "--" : `${Math.round(left)}%`;
-  // Top line: severity icon, name, worst window. Details live in the submenu so the dropdown stays short.
-  console.log(`${poolName(pool).padEnd(18)} ${pct.padStart(4)} ${win.padEnd(2)} ${reset}${badge} | font=Menlo size=13 color=${sev === "ok" || !sev ? brand(pool.agent) : hex} ${iconParams(pool.agent)} trim=false`);
+  const filled = Math.max(left > 0 ? 1 : 0, Math.round((left / 100) * BAR));
+  return paint(hex, "█".repeat(filled)) + paint(GRAY, "░".repeat(BAR - filled)) + paint(hex, ` ${String(Math.round(left)).padStart(3)}%`);
+};
+const NAME_W = 22;
+const nameOf = (pool: Pool) => poolName(pool).replace(/^Antigravity · /, "AG · ").slice(0, NAME_W).padEnd(NAME_W);
+console.log(`${paint(GRAY, "Agent".padEnd(NAME_W))} ${paint(GRAY, "5h limit".padEnd(14))} ${paint(GRAY, "7d limit".padEnd(14))} ${paint(GRAY, "Status")} | ansi=true font=Menlo size=11 trim=false`);
+for (const pool of sortedPools) {
+  const five = pool.rows.find((r) => r.limit === "5h");
+  const seven = pool.rows.find((r) => r.limit === "7d");
+  const single = !five && !seven ? worstRow(pool.rows) ?? undefined : undefined;
+  const st = statusWord(pool);
+  const stHex = st.sev ? SEV_COLOR[st.sev] : GRAY;
+  console.log(`${paint(brand(pool.agent), nameOf(pool))} ${cell(five ?? single)} ${cell(seven)} ${paint(stHex, st.text + (st.text === "HIGH BURN" ? " 🔥" : ""))} | ansi=true font=Menlo size=12 trim=false`);
   if (pool.account !== "default") console.log(`--${clean(pool.account)} | color=${GRAY} size=11`);
   const rows: Row[] = [...pool.rows].sort((a, b) => order(a.limit) - order(b.limit));
   for (const row of rows) {
@@ -150,15 +145,12 @@ for (const pool of sortedPools) {
     const rowHex = rowSev ? SEV_COLOR[rowSev] : GRAY;
     const name = LIMIT_NAME[row.limit] ?? (row.limit === "-" ? "Quota" : row.limit);
     const note = row.note ? clean(row.note) : "";
-    console.log(`--${name.padEnd(13)} ${l === null ? "no data" : `${Math.round(l)}% left`}${row.resetAt ? `  ·  resets in ${until(row.resetAt)}` : ""}${note ? `  ·  ${note}` : ""} | font=Menlo size=12 color=${rowHex} sfimage=${icon(rowSev)} sfcolor=${rowHex} trim=false`);
+    console.log(`--${name.padEnd(13)} ${l === null ? "no data" : `${Math.round(l)}% left`}${row.resetAt ? `  ·  resets in ${until(row.resetAt)}` : ""}${note ? `  ·  ${note}` : ""} | font=Menlo size=12 color=${rowHex} trim=false`);
     console.log(`--${paceBar(row.used, elapsedOf(row))} | font=Menlo size=12 color=${rowHex} trim=false`);
     console.log(`--${detailText(row)} | font=Menlo size=11 color=${GRAY} trim=false`);
     if (f) {
       const fmt = (n: number) => (n < 10 ? n.toFixed(1) : String(Math.round(n)));
-      const per = `${fmt(f.rate)}%/${f.unit}`;
-      const safe = `safe ≤ ${fmt(f.safe)}%/${f.unit}`;
-      const msg = will ? `⚠ ${per} burn  ·  ${safe}` : `${per} burn  ·  ~${Math.round(f.endLeft)}% left at reset  ·  ${safe}`;
-      console.log(`--${msg} | font=Menlo size=11 color=${will ? ORANGE : GRAY} trim=false`);
+      console.log(`--${fmt(f.rate)}%/${f.unit} burn  ·  safe ≤ ${fmt(f.safe)}%/${f.unit} | font=Menlo size=11 color=${will ? ORANGE : GRAY} trim=false`);
     }
   }
 }
