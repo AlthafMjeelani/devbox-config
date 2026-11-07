@@ -7,7 +7,7 @@
 // <swiftbar.hideDisablePlugin>true</swiftbar.hideDisablePlugin>
 
 import { renderBar } from "../lib/barimage.ts";
-import { renderTable, type Cell } from "../lib/tableimage.ts";
+import { renderTable, tableSize, type Cell } from "../lib/tableimage.ts";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -129,11 +129,12 @@ const tableRows = sortedPools.map((pool) => {
   const st = statusWord(pool);
   return { name: nameOf(pool), nameColor: "#F2F2F7", five: cellOf(five ?? single), seven: cellOf(seven), status: st.text, statusColor: st.sev ? SEV_COLOR[st.sev] : GRAY };
 });
-if (tableRows.length) console.log(` | image=${renderTable({ connected: live.length, attention: attentionCount, rows: tableRows })}`);
+if (tableRows.length) console.log(` | width=${tableSize(tableRows.length).width} height=${tableSize(tableRows.length).height} image=${renderTable({ connected: live.length, attention: attentionCount, rows: tableRows })}`);
 console.log("---");
+if (sortedPools.length) console.log("Details | sfimage=chart.bar.doc.horizontal size=13");
 for (const pool of sortedPools) {
-  console.log(`${nameOf(pool)}  ·  details | size=12 color=${GRAY}`);
-  if (pool.account !== "default") console.log(`--${clean(pool.account)} | color=${GRAY} size=11`);
+  console.log(`--${nameOf(pool)} | size=12`);
+  if (pool.account !== "default") console.log(`----${clean(pool.account)} | color=${GRAY} size=11`);
   const rows: Row[] = [...pool.rows].sort((a, b) => order(a.limit) - order(b.limit));
   for (const row of rows) {
     const l = leftOf(row);
@@ -143,12 +144,12 @@ for (const pool of sortedPools) {
     const rowHex = rowSev ? SEV_COLOR[rowSev] : GRAY;
     const name = LIMIT_NAME[row.limit] ?? (row.limit === "-" ? "Quota" : row.limit);
     const note = row.note ? clean(row.note) : "";
-    console.log(`--${name.padEnd(13)} ${l === null ? "no data" : `${Math.round(l)}% left`}${row.resetAt ? `  ·  resets in ${until(row.resetAt)}` : ""}${note ? `  ·  ${note}` : ""} | font=Menlo size=12 color=${rowHex} trim=false`);
-    console.log(`--${paceBar(row.used, elapsedOf(row))} | font=Menlo size=12 color=${rowHex} trim=false`);
-    console.log(`--${detailText(row)} | font=Menlo size=11 color=${GRAY} trim=false`);
+    console.log(`----${name.padEnd(13)} ${l === null ? "no data" : `${Math.round(l)}% left`}${row.resetAt ? `  ·  resets in ${until(row.resetAt)}` : ""}${note ? `  ·  ${note}` : ""} | font=Menlo size=12 color=${rowHex} trim=false`);
+    console.log(`----${paceBar(row.used, elapsedOf(row))} | font=Menlo size=12 color=${rowHex} trim=false`);
+    console.log(`----${detailText(row)} | font=Menlo size=11 color=${GRAY} trim=false`);
     if (f) {
       const fmt = (n: number) => (n < 10 ? n.toFixed(1) : String(Math.round(n)));
-      console.log(`--${fmt(f.rate)}%/${f.unit} burn  ·  safe ≤ ${fmt(f.safe)}%/${f.unit} | font=Menlo size=11 color=${will ? ORANGE : GRAY} trim=false`);
+      console.log(`----${fmt(f.rate)}%/${f.unit} burn  ·  safe ≤ ${fmt(f.safe)}%/${f.unit} | font=Menlo size=11 color=${will ? ORANGE : GRAY} trim=false`);
     }
   }
 }

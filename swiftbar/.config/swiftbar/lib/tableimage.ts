@@ -9,8 +9,12 @@ const S = 2, W = 412;
 const BG = rgb("#1E2028"), TRACK = rgb("#FFFFFF", 40), WHITE = rgb("#F2F2F7"), GRAY = rgb("#8E8E93"), LINE = rgb("#FFFFFF", 28);
 const GREEN = "#30D158", YELLOW = "#FFD60A";
 
+const ROWS_H = 28, TOP = 98;
+/** Size in points; SwiftBar needs it (width=/height=) or it shrinks dropdown images to icon size. */
+export const tableSize = (rows: number) => ({ width: W, height: TOP + Math.max(1, rows) * ROWS_H + 12 });
+
 export function renderTable(t: Table): string {
-  const rowsH = 28, top = 98, H = top + Math.max(1, t.rows.length) * rowsH + 12;
+  const rowsH = ROWS_H, top = TOP, H = tableSize(t.rows.length).height;
   const c = new Canvas(W * S, H * S);
   const lh = (set: string) => c.lineHeight(set);
   // y values are in points; text is positioned by its vertical center.
