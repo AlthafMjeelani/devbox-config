@@ -224,10 +224,16 @@ for dir in "$HOME/.claude/skills" "$HOME/.agents/skills" "$HOME/.config/opencode
     warn "$dir is missing"
   fi
   if [ -d "$dir" ]; then
-    dangling="$(find "$dir" -maxdepth 2 -type l ! -exec test -e {} \; -print 2>/dev/null | wc -l | tr -d ' ')"
-    [ "$dangling" -gt 0 ] && warn "$dir: $dangling dangling symlinks (remove: find $dir -maxdepth 1 -type l ! -exec test -e {} \\; -delete)"
+    # Prune symlinks whose target is gone (old repo layout, removed skills). Real files are never touched.
+    dangling="$(find "$dir" -maxdepth 1 -type l ! -exec test -e {} \; -print 2>/dev/null | wc -l | tr -d ' ')"
+    if [ "$dangling" -gt 0 ]; then
+      find "$dir" -maxdepth 1 -type l ! -exec test -e {} \; -delete
+      ok "$dir: pruned $dangling dangling symlinks"
+    fi
   fi
 done
+# Codex keeps its own built-in skills here, so only prune dangling links (no count check).
+[ -d "$HOME/.codex/skills" ] && find "$HOME/.codex/skills" -maxdepth 1 -type l ! -exec test -e {} \; -delete
 if make verify-agent-workflow >/tmp/devbox-verify.log 2>&1; then ok "make verify-agent-workflow passed"; else warn "verify-agent-workflow reported problems, see /tmp/devbox-verify.log"; fi
 if [ "$PLATFORM" = linux ]; then ok "AI usage in your bar: see docs/LINUX-STATUSBAR.md (waybar, tmux: ai-usage-bar)"; fi
 case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) warn 'Add to your shell profile: export PATH="$HOME/.local/bin:$PATH"' ;; esac
