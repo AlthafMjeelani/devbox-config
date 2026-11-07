@@ -31,8 +31,8 @@ describe("ai-usage-bar", () => {
   test("plain text puts the agent needing attention first", () => {
     const { out, code } = run(data);
     expect(code).toBe(0);
-    expect(out.startsWith("✺ Cl 8%▲")).toBe(true);
-    expect(out).toContain("ϟ Amp 90%");
+    expect(out.startsWith("✺ ▰▰▰▰▰  ⌘ ▰▱▱▱▱")).toBe(true);
+    expect(out).not.toContain("Amp");
   });
 
   test("waybar output is valid JSON with a severity class and tooltip", () => {

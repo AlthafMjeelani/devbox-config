@@ -12,7 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   GRAY, ORANGE, RED, SEV_COLOR, glyphOf, symbolOf, breaches, connected, diffAlerts, forecast, hasQuota, leftOf, pickBest, poolSeverities, poolSeverity,
-  selectMenubar, summarizeAgents, paceBar, elapsedOf, detailText, until, worstRow, type Pool, type Row, type Sev,
+  barMeters, summarizeAgents, paceBar, elapsedOf, detailText, until, worstRow, type Pool, type Row, type Sev,
 } from "../lib/aiusage.ts";
 
 const bin = path.join(os.homedir(), ".local/bin");
@@ -92,21 +92,13 @@ const offline = pools.filter((p) => !connected(p));
 const best = pickBest(pools);
 const blockedAll = pools.length > 0 && !best && pools.some((p) => p.status === "blocked");
 
-// ---- menu bar: attention first, best agent to spend next, the rest collapsed ----
+// ---- menu bar: a tiny session meter per live Claude / Codex account ----
 const summaries = summarizeAgents(pools);
-const { shown, hidden, hiddenAttention } = selectMenubar(summaries, best?.agent, 3);
-const segments = shown.map((s) => {
-  const name = SHORT[s.agent] ?? s.agent.slice(0, 3);
-  const glyph = glyphOf(s.agent);
-  if (!s.row || s.left === null) return `${paint(GRAY, glyph)} ${paint(GRAY, `${name} --`)}`;
-  const hex = s.sev ? SEV_COLOR[s.sev] : GRAY;
-  const flag = s.sev === "ok" ? "" : "▲";
-  const win = s.row.limit === "-" ? "" : ` ${s.row.limit}`;
-  const reset = s.row.resetAt ? ` ↻${until(s.row.resetAt)}` : "";
-  // The glyph keeps the agent's identity color; the text carries the status color.
-  return `${paint(brand(s.agent), glyph)} ${paint(hex, `${name} ${Math.round(s.left)}%${flag}${win}${reset}`)}`;
+const meters = barMeters(pools);
+const segments = meters.map((m) => {
+  const hex = m.sev === "crit" ? RED : m.sev === "warn" ? ORANGE : brand(m.agent);
+  return `${paint(brand(m.agent), glyphOf(m.agent))} ${paint(hex, m.meter)}`;
 });
-if (hidden > 0) segments.push(paint(hiddenAttention > 0 ? ORANGE : GRAY, hiddenAttention > 0 ? `+${hidden} (${hiddenAttention}▲)` : `+${hidden} ok`));
 if (staleSince) segments.push(paint(GRAY, "⟳stale"));
 console.log(segments.length
   ? `${segments.join("   ")} | ansi=true size=12`

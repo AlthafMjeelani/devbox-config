@@ -206,3 +206,24 @@ export function detailText(row: Row, now = Date.now()): string {
   else if (row.resetAt) parts.push(`resets in ${until(row.resetAt, now)}`);
   return parts.join(" · ");
 }
+
+// ---- bar: one tiny meter per live Claude / Codex account (session window), like the dotfiles widget ----
+export const miniMeter = (used: number | null, cells = 5): string => {
+  const f = used === null ? 0 : Math.max(used > 0 ? 1 : 0, Math.round((Math.min(100, used) / 100) * cells));
+  return "▰".repeat(f) + "▱".repeat(cells - f);
+};
+export const usedSeverity = (used: number | null): Sev | null => (used === null ? null : used >= 90 ? "crit" : used >= 75 ? "warn" : "ok");
+
+export type BarMeter = { agent: string; used: number | null; sev: Sev | null; meter: string };
+export function barMeters(pools: Pool[]): BarMeter[] {
+  const out: BarMeter[] = [];
+  for (const agent of ["Claude", "Codex"]) {
+    const mine = pools.filter((p) => p.agent === agent && connected(p));
+    if (!mine.length) continue;
+    const rows = mine.flatMap((p) => p.rows).filter((r) => r.used !== null);
+    const session = rows.find((r) => r.limit === "5h") ?? rows[0];
+    const used = session ? session.used : null;
+    out.push({ agent, used, sev: usedSeverity(used), meter: miniMeter(used) });
+  }
+  return out;
+}
