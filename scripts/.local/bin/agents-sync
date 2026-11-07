@@ -120,9 +120,12 @@ function syncCodexSkillLinks(sourceDir: string, targetDir: string) {
       continue;
     }
     if (currentTarget !== undefined) {
-      throw new Error(`Refusing to replace existing Codex skill: ${file}`);
-    }
-    if (fs.existsSync(file)) {
+      const resolved = path.resolve(targetDir, currentTarget);
+      // Stale links are ours to fix: dangling, pointing into this repo's old skill location, or --force.
+      const stale = !fs.existsSync(resolved) || resolved.startsWith(repo + path.sep) || process.argv.includes("--force");
+      if (!stale) throw new Error(`Refusing to replace existing Codex skill: ${file} -> ${currentTarget} (re-run with --force to replace it)`);
+      fs.unlinkSync(file);
+    } else if (fs.existsSync(file)) {
       const entry = fs.lstatSync(file);
       if (entry.isDirectory() && isEmptyDirectoryTree(file)) fs.rmSync(file, { recursive: true });
       else throw new Error(`Refusing to replace existing Codex skill: ${file}`);

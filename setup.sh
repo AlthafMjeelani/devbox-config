@@ -132,7 +132,7 @@ fi
 
 # ---- 3. agents-sync + stow -------------------------------------------------------------------
 step "3/6 Syncing agent skills and linking packages"
-run make agents-sync
+run ./scripts/.local/bin/agents-sync --force   # --force: replace stale links from older installs
 run make stow PKG="$PKGS"
 [ "$DRY" = 0 ] && ok "Linked: $PKGS"
 
