@@ -7,6 +7,7 @@
 // <swiftbar.hideDisablePlugin>true</swiftbar.hideDisablePlugin>
 
 import { renderBar } from "../lib/barimage.ts";
+import { renderTable, type Cell } from "../lib/tableimage.ts";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -97,7 +98,7 @@ const blockedAll = pools.length > 0 && !best && pools.some((p) => p.status === "
 const summaries = summarizeAgents(pools);
 const meters = barMeters(pools);
 if (meters.length) {
-  const png = renderBar(meters.map((m) => ({ used: m.left, label: m.agent === "Claude" ? "CL" : "CX", color: m.sev === "crit" ? RED : m.sev === "warn" ? ORANGE : brand(m.agent) })));
+  const png = renderBar(meters.map((m) => ({ used: m.left, label: m.agent === "Claude" ? "CL" : "CX", labelColor: brand(m.agent), color: m.sev === "crit" ? RED : m.sev === "warn" ? ORANGE : m.sev === "ok" ? SEV_COLOR.ok : GRAY })));
   console.log(`${staleSince ? "⟳" : ""} | image=${png}`);
 } else {
   console.log(`AI -- | sfimage=gauge.with.dots.needle.0percent color=${blockedAll ? RED : GRAY}`);
@@ -106,35 +107,32 @@ if (meters.length) {
 // ---- dropdown ----
 console.log("---");
 const attentionCount = summaries.filter((s) => s.sev === "crit" || s.sev === "warn").length;
-console.log(`${paint(SEV_COLOR.ok, "●")} ${live.length} connected     ${paint(attentionCount ? ORANGE : GRAY, "●")} ${attentionCount} need attention | ansi=true font=Menlo size=12`);
 if (staleSince) console.log(`⚠ Showing data from ${until(Date.now() + (Date.now() - staleSince))} ago (${failure}) | color=${ORANGE} size=11`);
-console.log("---");
 
 const SEV_ORDER: Record<string, number> = { crit: 0, warn: 1, ok: 2 };
 const sortedPools = [...quotaPools].sort(
   (a, b) => (SEV_ORDER[poolSeverity(a) ?? "ok"] ?? 2) - (SEV_ORDER[poolSeverity(b) ?? "ok"] ?? 2) || (a.left ?? 101) - (b.left ?? 101),
 );
 
-// Table: Agent | 5h limit | 7d limit | Status. Bars show what is LEFT, colored by how worried to be.
-const BAR = 8;
-const cell = (row: Row | undefined) => {
-  if (!row || row.used === null) return paint(GRAY, "░".repeat(BAR) + "   --");
+// The card is one image (green / orange / red bars, colored percentages and status); details stay native below.
+const cellOf = (row: Row | undefined): Cell => {
+  if (!row || row.used === null) return null;
   const left = Math.max(0, Math.min(100, 100 - row.used));
   const sev = severity(left, breaches(row));
-  const hex = sev ? SEV_COLOR[sev] : GRAY;
-  const filled = Math.max(left > 0 ? 1 : 0, Math.round((left / 100) * BAR));
-  return paint(hex, "█".repeat(filled)) + paint(GRAY, "░".repeat(BAR - filled)) + paint(hex, ` ${String(Math.round(left)).padStart(3)}%`);
+  return { left, color: sev ? SEV_COLOR[sev] : GRAY };
 };
-const NAME_W = 22;
-const nameOf = (pool: Pool) => poolName(pool).replace(/^Antigravity · /, "AG · ").slice(0, NAME_W).padEnd(NAME_W);
-console.log(`${paint(GRAY, "Agent".padEnd(NAME_W))} ${paint(GRAY, "5h limit".padEnd(14))} ${paint(GRAY, "7d limit".padEnd(14))} ${paint(GRAY, "Status")} | ansi=true font=Menlo size=11 trim=false`);
-for (const pool of sortedPools) {
+const nameOf = (pool: Pool) => poolName(pool).replace(/^Antigravity · /, "AG · ");
+const tableRows = sortedPools.map((pool) => {
   const five = pool.rows.find((r) => r.limit === "5h");
   const seven = pool.rows.find((r) => r.limit === "7d");
   const single = !five && !seven ? worstRow(pool.rows) ?? undefined : undefined;
   const st = statusWord(pool);
-  const stHex = st.sev ? SEV_COLOR[st.sev] : GRAY;
-  console.log(`${paint(brand(pool.agent), nameOf(pool))} ${cell(five ?? single)} ${cell(seven)} ${paint(stHex, st.text + (st.text === "HIGH BURN" ? " 🔥" : ""))} | ansi=true font=Menlo size=12 trim=false`);
+  return { name: nameOf(pool), nameColor: "#F2F2F7", five: cellOf(five ?? single), seven: cellOf(seven), status: st.text, statusColor: st.sev ? SEV_COLOR[st.sev] : GRAY };
+});
+if (tableRows.length) console.log(`| image=${renderTable({ connected: live.length, attention: attentionCount, rows: tableRows })}`);
+console.log("---");
+for (const pool of sortedPools) {
+  console.log(`${nameOf(pool)}  ·  details | size=12 color=${GRAY}`);
   if (pool.account !== "default") console.log(`--${clean(pool.account)} | color=${GRAY} size=11`);
   const rows: Row[] = [...pool.rows].sort((a, b) => order(a.limit) - order(b.limit));
   for (const row of rows) {

@@ -1,8 +1,8 @@
 // Menu bar image: per agent a colored dot, a rounded meter and the percent used. Pure TypeScript PNG
 // writer (no dependencies), drawn at 2x and tagged 144 dpi so macOS shows it sharp at 18pt tall.
-import zlib from "node:zlib";
+import { encodePng } from "./draw.ts";
 
-export type BarItem = { color: string; used: number | null; label?: string };
+export type BarItem = { color: string; used: number | null; label?: string; labelColor?: string };
 
 const S = 2;                       // pixels per point
 const H = 18 * S;
@@ -68,7 +68,7 @@ export function renderBar(items: BarItem[]): string {
   items.forEach((item, n) => {
     const c = item.used === null ? ([142, 142, 147, 255] as RGBA) : hex(item.color);
     const cy = H / 2;
-    if (item.label) { drawText(item.label, x, cy - (5 * CELL) / 2, c); x += textWidth(item.label) + gap; }
+    if (item.label) { drawText(item.label, x, cy - (5 * CELL) / 2, item.labelColor ? hex(item.labelColor) : c); x += textWidth(item.label) + gap; }
     const bx = x;
     roundRect(bx, cy - barH / 2, barW, barH, barH / 2, TRACK);
     const fill = item.used === null ? 0 : Math.max(item.used > 0 ? barH : 0, (Math.min(100, item.used) / 100) * barW);
@@ -83,28 +83,4 @@ export function renderBar(items: BarItem[]): string {
   });
 
   return encodePng(px, W, H).toString("base64");
-}
-
-// ---- minimal PNG encoder ----
-const crcTable = (() => {
-  const t = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
-  return t;
-})();
-const crc32 = (buf: Uint8Array) => { let c = 0xffffffff; for (const b of buf) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
-function chunk(type: string, data: Uint8Array): Buffer {
-  const out = Buffer.alloc(12 + data.length);
-  out.writeUInt32BE(data.length, 0);
-  out.write(type, 4, "ascii");
-  Buffer.from(data).copy(out, 8);
-  out.writeUInt32BE(crc32(out.subarray(4, 8 + data.length)), 8 + data.length);
-  return out;
-}
-function encodePng(px: Uint8ClampedArray, w: number, h: number): Buffer {
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 6;
-  const phys = Buffer.alloc(9); phys.writeUInt32BE(5669, 0); phys.writeUInt32BE(5669, 4); phys[8] = 1; // 144 dpi
-  const raw = Buffer.alloc((w * 4 + 1) * h);
-  for (let y = 0; y < h; y++) { raw[y * (w * 4 + 1)] = 0; Buffer.from(px.buffer, y * w * 4, w * 4).copy(raw, y * (w * 4 + 1) + 1); }
-  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk("IHDR", ihdr), chunk("pHYs", phys), chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
 }
