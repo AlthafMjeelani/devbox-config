@@ -6,6 +6,7 @@
 // <swiftbar.hideRunInTerminal>true</swiftbar.hideRunInTerminal>
 // <swiftbar.hideDisablePlugin>true</swiftbar.hideDisablePlugin>
 
+import { renderBar } from "../lib/barimage.ts";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -95,14 +96,12 @@ const blockedAll = pools.length > 0 && !best && pools.some((p) => p.status === "
 // ---- menu bar: a tiny session meter per live Claude / Codex account ----
 const summaries = summarizeAgents(pools);
 const meters = barMeters(pools);
-const segments = meters.map((m) => {
-  const hex = m.sev === "crit" ? RED : m.sev === "warn" ? ORANGE : brand(m.agent);
-  return `${paint(brand(m.agent), glyphOf(m.agent))} ${paint(hex, m.meter)}`;
-});
-if (staleSince) segments.push(paint(GRAY, "⟳stale"));
-console.log(segments.length
-  ? `${segments.join("   ")} | ansi=true size=12`
-  : `AI -- | sfimage=gauge.with.dots.needle.0percent color=${blockedAll ? RED : GRAY}`);
+if (meters.length) {
+  const png = renderBar(meters.map((m) => ({ used: m.used, letter: m.agent === "Claude" ? "C" : "X", color: m.sev === "crit" ? RED : m.sev === "warn" ? ORANGE : brand(m.agent) })));
+  console.log(`${staleSince ? "⟳" : ""} | image=${png}`);
+} else {
+  console.log(`AI -- | sfimage=gauge.with.dots.needle.0percent color=${blockedAll ? RED : GRAY}`);
+}
 
 // ---- dropdown ----
 console.log("---");
