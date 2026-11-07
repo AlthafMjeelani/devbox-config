@@ -2,7 +2,7 @@
 // writer (no dependencies), drawn at 2x and tagged 144 dpi so macOS shows it sharp at 18pt tall.
 import zlib from "node:zlib";
 
-export type BarItem = { color: string; used: number | null; letter?: string };
+export type BarItem = { color: string; used: number | null; label?: string };
 
 const S = 2;                       // pixels per point
 const H = 18 * S;
@@ -16,7 +16,7 @@ const FONT: Record<string, string> = {
   "0": "111101101101111", "1": "010110010010111", "2": "111001111100111", "3": "111001111001111",
   "4": "101101111001001", "5": "111100111001111", "6": "111100111101111", "7": "111001001010010",
   "8": "111101111101111", "9": "111101111001111", "-": "000000111000000",
-  C: "111100100100111", X: "101101010101101", A: "010101111101101", G: "111100101101111", K: "101101110101101", O: "111101101101111",
+  C: "111100100100111", X: "101101010101101", A: "010101111101101", G: "111100101101111", K: "101101110101101", O: "111101101101111", L: "100100100100111",
 };
 const CELL = 4, GLYPH_W = 3 * CELL, ADVANCE = GLYPH_W + CELL;
 
@@ -25,7 +25,8 @@ const textWidth = (t: string) => t.length * ADVANCE - CELL;
 export function renderBar(items: BarItem[]): string {
   const dot = 10 * S, barW = 26 * S, barH = 6 * S, gap = 4 * S, between = 10 * S;
   const labels = items.map((i) => (i.used === null ? "--" : `${Math.round(Math.min(100, Math.max(0, i.used)))}`));
-  const itemW = labels.map((l) => dot + gap + barW + gap + textWidth(l));
+  const PCT_W = 10 + CELL;
+  const itemW = labels.map((l, n) => (items[n].label ? textWidth(items[n].label!) + gap : 0) + barW + gap + textWidth(l) + PCT_W);
   const W = itemW.reduce((a, b) => a + b, 0) + between * Math.max(0, items.length - 1) + 2 * S;
   const px = new Uint8ClampedArray(W * H * 4);
 
@@ -67,20 +68,18 @@ export function renderBar(items: BarItem[]): string {
   items.forEach((item, n) => {
     const c = item.used === null ? ([142, 142, 147, 255] as RGBA) : hex(item.color);
     const cy = H / 2;
-    roundRect(x, cy - dot / 2, dot, dot, dot / 2, c);
-    if (item.letter) {
-      const ink: RGBA = [20, 20, 26, 255], cell = 2, g = FONT[item.letter] ?? "";
-      for (let i = 0; i < g.length; i++) if (g[i] === "1") {
-        const gx = x + (dot - 3 * cell) / 2 + (i % 3) * cell, gy = cy - (5 * cell) / 2 + Math.floor(i / 3) * cell;
-        for (let dy = 0; dy < cell; dy++) for (let dx = 0; dx < cell; dx++) blend(gx + dx, gy + dy, ink, 1);
-      }
-    }
-    const bx = x + dot + gap;
+    if (item.label) { drawText(item.label, x, cy - (5 * CELL) / 2, c); x += textWidth(item.label) + gap; }
+    const bx = x;
     roundRect(bx, cy - barH / 2, barW, barH, barH / 2, TRACK);
     const fill = item.used === null ? 0 : Math.max(item.used > 0 ? barH : 0, (Math.min(100, item.used) / 100) * barW);
     roundRect(bx, cy - barH / 2, fill, barH, barH / 2, c);
-    drawText(labels[n], bx + barW + gap, cy - (5 * CELL) / 2, c);
-    x += itemW[n] + between;
+    const tx = bx + barW + gap;
+    drawText(labels[n], tx, cy - (5 * CELL) / 2, c);
+    if (item.used !== null) {
+      const pct = ["11001", "11010", "00010", "00100", "01000", "01011", "10011"], px0 = tx + textWidth(labels[n]) + CELL;
+      pct.forEach((row, ry) => [...row].forEach((v, rx) => { if (v === "1") for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) blend(px0 + rx * 2 + dx, cy - 7 + ry * 2 + dy, c, 1); }));
+    }
+    x += barW + gap + textWidth(labels[n]) + PCT_W + between;
   });
 
   return encodePng(px, W, H).toString("base64");

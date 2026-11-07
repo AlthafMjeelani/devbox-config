@@ -97,7 +97,7 @@ const blockedAll = pools.length > 0 && !best && pools.some((p) => p.status === "
 const summaries = summarizeAgents(pools);
 const meters = barMeters(pools);
 if (meters.length) {
-  const png = renderBar(meters.map((m) => ({ used: m.used, letter: m.agent === "Claude" ? "C" : "X", color: m.sev === "crit" ? RED : m.sev === "warn" ? ORANGE : brand(m.agent) })));
+  const png = renderBar(meters.map((m) => ({ used: m.used, label: m.agent === "Claude" ? "CL" : "CX", color: m.sev === "crit" ? RED : m.sev === "warn" ? ORANGE : brand(m.agent) })));
   console.log(`${staleSince ? "⟳" : ""} | image=${png}`);
 } else {
   console.log(`AI -- | sfimage=gauge.with.dots.needle.0percent color=${blockedAll ? RED : GRAY}`);
