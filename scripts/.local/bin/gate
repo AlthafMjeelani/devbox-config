@@ -408,7 +408,7 @@ gate_fix_antigravity() {
 
 Work only in the current disposable worktree. Do not push, open or modify pull requests,
 use sudo, rewrite Git history, delete the worktree, or perform outward-facing actions." \
-		--model gemini-3.6-flash-high --dangerously-skip-permissions
+		--model gemini-3.8-flash-high --dangerously-skip-permissions
 }
 
 run_review() {

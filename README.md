@@ -35,7 +35,7 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 
 ## What you get
 
-**One skill set for every agent.** All 126 skills live in `agents/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
+**One skill set for every agent.** All 129 skills live in `agents/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
 
 **A macOS menu bar** (SwiftBar) with two plugins:
 

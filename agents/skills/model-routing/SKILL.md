@@ -14,7 +14,7 @@ Use the strongest model where mistakes are expensive, and the cheapest one that 
 | Normal features, fixes, tests, code review | standard | `sonnet` | `gpt-6.1-terra` | medium |
 | Docs, renames, formatting, search, summaries, commit messages | fast | `haiku` | `gpt-6-luna` | low |
 
-Antigravity: `gemini-3.1-pro-high` for deep and standard, `gemini-3.6-flash-*` for fast. The source of truth for roles is `agents/models.json`; change it there, then run `agents-sync`.
+Antigravity: `gemini-3.1-pro-high` for deep and standard, `gemini-3.8-flash-*` for fast. The source of truth for roles is `agents/models.json`; change it there, then run `agents-sync`.
 
 ## Rules
 1. Always use the newest model in the tier. Claude aliases (`opus`, `sonnet`, `haiku`) already track the latest. For Codex and Gemini, check `docs/MODELS.md` monthly and update `models.json`.

@@ -8,7 +8,7 @@ How to pick models, keep them current, and spend tokens on purpose.
 |---|---|---|---|---|---|
 | Architecture, security, hard bugs | deep | `opus` | `gpt-6.1-sol` | `gemini-3.1-pro-high` | high |
 | Features, fixes, tests, review | standard | `sonnet` | `gpt-6.1-terra` | `gemini-3.1-pro-high` | medium |
-| Docs, renames, search, summaries | fast | `haiku` | `gpt-6-luna` | `gemini-3.6-flash-*` | low |
+| Docs, renames, search, summaries | fast | `haiku` | `gpt-6-luna` | `gemini-3.8-flash-*` | low |
 
 Role-level choices (reviewer, debugger, tester and so on) live in `agents/models.json`.
 After editing it, run `agents-sync` to regenerate the subagent files for Claude and Codex.
