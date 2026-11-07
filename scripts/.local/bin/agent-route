@@ -51,7 +51,7 @@ const MODELS = {
 export function command(engine: keyof typeof MODELS, tier: Tier, effort: Effort): string {
   const m = MODELS[engine][tier];
   if (engine === "codex") return `codex -m ${m} -c model_reasoning_effort=${effort}`;
-  if (engine === "claude") return `claude --model ${m}${effort === "low" ? "" : ` --effort ${effort}`}`;
+  if (engine === "claude") return `claude --model ${m}`;
   return `opencode --model ${m}`;
 }
 

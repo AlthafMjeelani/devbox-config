@@ -165,7 +165,9 @@ if printf '%s' " $PKGS " | grep -q ' rex '; then
     "$REXBIN" config reload >/dev/null 2>&1 || true
     ok "Rex config valid and reloaded"
   else
-    warn "rex config check failed, see /tmp/devbox-rex-check.log (edit ~/.config/rex/init.lua; Rex works without it)"
+    warn "rex config check failed (Rex works without it). First lines of the error:"
+    head -n 6 /tmp/devbox-rex-check.log | sed 's/^/      /' >&2
+    warn "Full log: /tmp/devbox-rex-check.log   Fix: edit ~/.config/rex/init.lua (or delete it) then run: rex config check"
   fi
 fi
 
