@@ -12,7 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   GRAY, ORANGE, RED, SEV_COLOR, glyphOf, symbolOf, breaches, connected, diffAlerts, forecast, hasQuota, leftOf, pickBest, poolSeverities, poolSeverity,
-  selectMenubar, summarizeAgents, until, worstRow, type Pool, type Row, type Sev,
+  selectMenubar, summarizeAgents, paceBar, elapsedOf, detailText, until, worstRow, type Pool, type Row, type Sev,
 } from "../lib/aiusage.ts";
 
 const bin = path.join(os.homedir(), ".local/bin");
@@ -160,14 +160,13 @@ for (const pool of sortedPools) {
     const name = LIMIT_NAME[row.limit] ?? (row.limit === "-" ? "Quota" : row.limit);
     const note = row.note ? clean(row.note) : "";
     console.log(`--${name.padEnd(13)} ${l === null ? "no data" : `${Math.round(l)}% left`}${row.resetAt ? `  ·  resets in ${until(row.resetAt)}` : ""}${note ? `  ·  ${note}` : ""} | font=Menlo size=12 color=${rowHex} sfimage=${icon(rowSev)} sfcolor=${rowHex} trim=false`);
-    console.log(`--${meter(l)} | font=Menlo size=12 color=${rowHex} trim=false`);
+    console.log(`--${paceBar(row.used, elapsedOf(row))} | font=Menlo size=12 color=${rowHex} trim=false`);
+    console.log(`--${detailText(row)} | font=Menlo size=11 color=${GRAY} trim=false`);
     if (f) {
       const fmt = (n: number) => (n < 10 ? n.toFixed(1) : String(Math.round(n)));
       const per = `${fmt(f.rate)}%/${f.unit}`;
       const safe = `safe ≤ ${fmt(f.safe)}%/${f.unit}`;
-      const msg = will
-        ? `⚠ at ${per} you hit the limit in ${until(Date.now() + f.breachInMs!)}  ·  ${safe}`
-        : `${per} burn  ·  ~${Math.round(f.endLeft)}% left at reset  ·  ${safe}`;
+      const msg = will ? `⚠ ${per} burn  ·  ${safe}` : `${per} burn  ·  ~${Math.round(f.endLeft)}% left at reset  ·  ${safe}`;
       console.log(`--${msg} | font=Menlo size=11 color=${will ? ORANGE : GRAY} trim=false`);
     }
   }

@@ -13,7 +13,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
-  connected, diffAlerts, glyphOf, pickBest, poolSeverities, poolSeverity, selectMenubar, summarizeAgents, until, worstRow, leftOf,
+  paceBar, elapsedOf, detailText, connected, diffAlerts, glyphOf, pickBest, poolSeverities, poolSeverity, selectMenubar, summarizeAgents, until, worstRow, leftOf,
   type Pool, type Sev,
 } from "../../../swiftbar/.config/swiftbar/lib/aiusage.ts";
 
@@ -94,7 +94,10 @@ if (format === "text") {
     const w = worstRow(p.rows);
     const left = w ? leftOf(w) : p.left;
     const sev = poolSeverity(p);
-    lines.push(`${glyphOf(p.agent)} ${p.agent}: ${left === null ? "--" : `${Math.round(left)}% left`}${w && w.limit !== "-" ? ` (${w.limit})` : ""}${w?.resetAt ? `, resets in ${until(w.resetAt)}` : ""}${sev === "crit" ? "  CRITICAL" : sev === "warn" ? "  LOW" : ""}`);
+    lines.push(`${glyphOf(p.agent)} ${p.agent}${sev === "crit" ? "  CRITICAL" : sev === "warn" ? "  LOW" : ""}`);
+    for (const r of [...p.rows].filter((x) => x.used !== null).sort((a, b) => (a.limit < b.limit ? -1 : 1))) {
+      lines.push(`  ${(r.limit === "-" ? "quota" : r.limit).padEnd(5)} ${paceBar(r.used, elapsedOf(r), 20)}`, `        ${detailText(r)}`);
+    }
   }
   if (best) lines.unshift(`Use first: ${best.agent}`, "");
   if (stale) lines.push("", "Showing the last good result (ai-usage failed)");

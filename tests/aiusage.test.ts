@@ -109,3 +109,23 @@ describe("agent icons", () => {
     expect(symbolOf("Mystery")).toBe("circle.fill");
   });
 });
+
+import { paceBar, detailText, elapsedOf } from "../swiftbar/.config/swiftbar/lib/aiusage.ts";
+describe("pace bar and detail line", () => {
+  const H = 3_600_000;
+  const now = 1_000_000_000_000;
+  const row = (used: number, hoursLeft: number) => ({ agent: "Claude", account: "a", pool: "p", limit: "5h", used, resetAt: now + hoursLeft * H });
+  test("tick sits at the elapsed share", () => {
+    expect(paceBar(20, 0.5, 10)).toBe("██░░░│░░░░");
+    expect(paceBar(80, 0.5, 10)).toBe("█████│██░░");
+  });
+  test("no window means no tick", () => expect(paceBar(50, null, 10)).toBe("█████░░░░░"));
+  test("elapsed from reset time", () => expect(elapsedOf(row(10, 2.5), now)).toBeCloseTo(0.5));
+  test("ahead of pace with forecast", () => {
+    const t = detailText(row(80, 2.5), now);
+    expect(t).toContain("80% used");
+    expect(t).toContain("30% ahead of pace");
+    expect(t).toContain("limit in");
+  });
+  test("under pace shows reset", () => expect(detailText(row(10, 2.5), now)).toMatch(/40% under pace · resets in 2h 30m/));
+});

@@ -168,3 +168,41 @@ export const AGENT_SYMBOL: Record<string, string> = {
 };
 export const glyphOf = (agent: string): string => AGENT_GLYPH[agent] ?? "◆";
 export const symbolOf = (agent: string): string => AGENT_SYMBOL[agent] ?? "circle.fill";
+
+// ---- usage bar with a pace tick, and the one-line context under it --------------------------
+// Fraction of the window already elapsed (0..1), or null when it is unknown.
+export function elapsedOf(row: Row, now = Date.now()): number | null {
+  const window = WINDOW_MS[row.limit];
+  if (!window || !row.resetAt) return null;
+  const remaining = row.resetAt - now;
+  if (remaining <= 0) return null;
+  return Math.max(0, Math.min(1, 1 - remaining / window));
+}
+
+// Filled = used. The tick │ marks where you would be if you spent evenly across the window.
+// Left of the tick when you are under pace, right of it when you are ahead.
+export function paceBar(used: number | null, elapsed: number | null, width = 28): string {
+  const u = Math.max(0, Math.min(1, (used ?? 0) / 100));
+  const fill = Math.round(u * width);
+  if (elapsed === null) return "█".repeat(fill) + "░".repeat(width - fill);
+  const tick = Math.min(width - 1, Math.round(elapsed * width));
+  let out = "";
+  for (let i = 0; i < width; i++) out += i === tick ? "│" : i < fill ? "█" : "░";
+  return out;
+}
+
+// "34% used · 12% ahead of pace · limit in ~2d 0h"  (or "resets in 3h 10m" when no breach is coming)
+export function detailText(row: Row, now = Date.now()): string {
+  if (row.used === null) return "no data";
+  const parts = [`${Math.round(row.used)}% used`];
+  const elapsed = elapsedOf(row, now);
+  if (elapsed !== null) {
+    const pts = Math.round(Math.abs(row.used / 100 - elapsed) * 100);
+    parts.push(pts < 2 ? "on pace" : `${pts}% ${row.used / 100 > elapsed ? "ahead of" : "under"} pace`);
+  }
+  const f = forecast(row, now);
+  if (row.used >= 100) parts.push("limit reached");
+  else if (f && f.breachInMs !== null) parts.push(`limit in ~${until(now + f.breachInMs, now)}`);
+  else if (row.resetAt) parts.push(`resets in ${until(row.resetAt, now)}`);
+  return parts.join(" · ");
+}
