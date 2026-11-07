@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# claude-statusline-install - point Claude Code's status line at claude-statusline.
+# Idempotent. Keeps a backup. Leaves an existing, different statusLine alone unless --force.
+set -euo pipefail
+settings="${CLAUDE_SETTINGS:-$HOME/.claude/settings.json}"
+cmd='~/.local/bin/claude-statusline'
+force=0; [ "${1:-}" = "--force" ] && force=1
+command -v jq >/dev/null || { echo "jq is required" >&2; exit 1; }
+mkdir -p "$(dirname "$settings")"
+[ -s "$settings" ] || echo '{}' > "$settings"
+current=$(jq -r '.statusLine.command // empty' "$settings")
+if [ "$current" = "$cmd" ]; then echo "status line already set"; exit 0; fi
+if [ -n "$current" ] && [ "$force" = 0 ]; then
+  echo "status line already set to '$current' (use --force to replace)"; exit 0
+fi
+cp "$settings" "$settings.bak.$(date +%Y%m%d-%H%M%S)"
+tmp=$(mktemp)
+jq --arg c "$cmd" '.statusLine = {type: "command", command: $c}' "$settings" > "$tmp" && mv "$tmp" "$settings"
+echo "status line set in $settings"

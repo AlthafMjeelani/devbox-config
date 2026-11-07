@@ -29,6 +29,7 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 | Run parallel agents in worktrees | `crew new "<task>" --claude` (see `agent-orchestration`) |
 | Run and message agents in Rex | `rex-agents spawn <name> -C <dir> -- claude`, `rex-agents send <name> "..."` |
 | Check a project's env files and gitignore | `env-check` (add missing keys to `.env.example` with `env-check --sync`) |
+| Show model, branch, context and usage bars in Claude Code | `claude-statusline-install` (setup does this for you) |
 | Make a repo agent-ready (AGENTS.md, docs, .env.example, plan) | `agentic-init` (preview with `--dry-run`, audit with `--check`) |
 | Allow commits on `main` in one repo | `git config devbox.allowDefaultBranch true` |
 | Edit a config | change the file in `$HOME` (it is a symlink), then `git commit` here |

@@ -145,6 +145,11 @@ else
 fi
 ok "Git hooks block commits on main/master/develop. Override: ALLOW_DEFAULT_BRANCH=1 or git config devbox.allowDefaultBranch true"
 
+# ---- 3a2. Claude Code status line (model, branch, context, 5h and 7d usage bars) ---------------
+if have jq && { [ -d "$HOME/.claude" ] || have claude; }; then
+  run "$REPO/scripts/.local/bin/claude-statusline-install"
+fi
+
 # ---- 3b. Rex terminal ------------------------------------------------------------------------
 if printf '%s' " $PKGS " | grep -q ' rex '; then
   step "3b Rex terminal"
