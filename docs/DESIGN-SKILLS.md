@@ -127,3 +127,11 @@ Do not commit or push unless requested.
 - `model-routing` - newest model and effort per task and per agent
 - `context-management` - compact, start fresh, hand off through files, read less
 - `project-agents-md` - write a short, accurate AGENTS.md for any repository
+
+## Figma
+
+`figma-workflow` wraps the official Figma MCP (`https://mcp.figma.com/mcp`). The server serves Figma's own skills, and the skill tells every agent to load the right one first with `get_figma_skill` instead of copying them here, so they stay current.
+
+- **Claude Code:** `setup.sh` runs `claude mcp add --scope user --transport http figma ...`; sign in with `/mcp`.
+- **Codex:** the `[mcp_servers.figma]` block in `agents/codex-config.toml.example`; sign in with `codex mcp login figma`.
+- **OpenCode:** the `mcp.figma` entry in `opencode.json`; sign in with `opencode mcp auth figma`.

@@ -712,5 +712,12 @@
       }
     }
   },
-  "plugin": []
+  "plugin": [],
+  "mcp": {
+    "figma": {
+      "type": "remote",
+      "url": "https://mcp.figma.com/mcp",
+      "enabled": true
+    }
+  }
 }

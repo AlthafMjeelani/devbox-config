@@ -37,3 +37,7 @@ status_line = [
   "five-hour-limit",
   "weekly-limit",
 ]
+
+# Figma MCP (design context, design-to-code). Sign in once with: codex mcp login figma
+[mcp_servers.figma]
+url = "https://mcp.figma.com/mcp"

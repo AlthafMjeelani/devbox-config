@@ -150,6 +150,11 @@ if have jq && { [ -d "$HOME/.claude" ] || have claude; }; then
   run "$REPO/scripts/.local/bin/claude-statusline-install"
 fi
 
+# ---- 3a3. Figma MCP for Claude Code (sign in once with /mcp). Codex and OpenCode get it from their config files.
+if have claude && ! claude mcp list 2>/dev/null | grep -qi '^figma'; then
+  run claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp || warn "could not add the Figma MCP; run: claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp"
+fi
+
 # ---- 3b. Rex terminal ------------------------------------------------------------------------
 if printf '%s' " $PKGS " | grep -q ' rex '; then
   step "3b Rex terminal"
