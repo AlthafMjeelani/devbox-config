@@ -41,3 +41,7 @@ status_line = [
 # Figma MCP (design context, design-to-code). Sign in once with: codex mcp login figma
 [mcp_servers.figma]
 url = "https://mcp.figma.com/mcp"
+
+# Vercel MCP (deployments, logs, env). Sign in once with: codex mcp login vercel
+[mcp_servers.vercel]
+url = "https://mcp.vercel.com"

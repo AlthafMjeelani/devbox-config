@@ -155,6 +155,11 @@ if have claude && ! claude mcp list 2>/dev/null | grep -qi '^figma'; then
   run claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp || warn "could not add the Figma MCP; run: claude mcp add --scope user --transport http figma https://mcp.figma.com/mcp"
 fi
 
+# ---- 3a4. Vercel MCP for Claude Code (sign in once with /mcp).
+if have claude && ! claude mcp list 2>/dev/null | grep -qi '^vercel'; then
+  run claude mcp add --scope user --transport http vercel https://mcp.vercel.com || warn "could not add the Vercel MCP; run: claude mcp add --scope user --transport http vercel https://mcp.vercel.com"
+fi
+
 # ---- 3b. Rex terminal ------------------------------------------------------------------------
 if printf '%s' " $PKGS " | grep -q ' rex '; then
   step "3b Rex terminal"

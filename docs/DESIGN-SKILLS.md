@@ -135,3 +135,7 @@ Do not commit or push unless requested.
 - **Claude Code:** `setup.sh` runs `claude mcp add --scope user --transport http figma ...`; sign in with `/mcp`.
 - **Codex:** the `[mcp_servers.figma]` block in `agents/codex-config.toml.example`; sign in with `codex mcp login figma`.
 - **OpenCode:** the `mcp.figma` entry in `opencode.json`; sign in with `opencode mcp auth figma`.
+
+## Vercel
+
+`vercel-workflow` uses the Vercel MCP (`https://mcp.vercel.com`) for deployments, logs, env vars, domains and rollbacks. Claude Code gets it from `setup.sh` (sign in with `/mcp`), Codex from `[mcp_servers.vercel]` (`codex mcp login vercel`) and OpenCode from `mcp.vercel` (`opencode mcp auth vercel`).
