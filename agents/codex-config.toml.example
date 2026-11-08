@@ -45,3 +45,16 @@ url = "https://mcp.figma.com/mcp"
 # Vercel MCP (deployments, logs, env). Sign in once with: codex mcp login vercel
 [mcp_servers.vercel]
 url = "https://mcp.vercel.com"
+
+# Design MCPs: screenshots, shadcn components, library docs
+[mcp_servers.playwright]
+command = "npx"
+args = ["@playwright/mcp@latest"]
+
+[mcp_servers.shadcn]
+command = "npx"
+args = ["shadcn@latest", "mcp"]
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]

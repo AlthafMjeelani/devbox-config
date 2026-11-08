@@ -139,3 +139,10 @@ Do not commit or push unless requested.
 ## Vercel
 
 `vercel-workflow` uses the Vercel MCP (`https://mcp.vercel.com`) for deployments, logs, env vars, domains and rollbacks. Claude Code gets it from `setup.sh` (sign in with `/mcp`), Codex from `[mcp_servers.vercel]` (`codex mcp login vercel`) and OpenCode from `mcp.vercel` (`opencode mcp auth vercel`).
+
+## Professional design process
+
+`design-workflow` is the standard order for any UI task, and `AGENTS.md` tells every agent to follow it:
+brief, direction (`ui-ux-pro-max`), tokens (`tailwind-design-tokens`), build, accessibility (`web-accessibility-audit`, WCAG 2.2 AA), visual QA (`visual-qa-playwright`), critique (`design-critique`), handoff (`design-handoff-spec`).
+
+MCPs for all agents: Playwright (screenshots), shadcn (components), Context7 (library docs), plus Figma and Vercel above. Claude Code gets them from `setup.sh`, Codex from `codex-config.toml.example`, OpenCode from `opencode.json`.

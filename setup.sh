@@ -160,6 +160,14 @@ if have claude && ! claude mcp list 2>/dev/null | grep -qi '^vercel'; then
   run claude mcp add --scope user --transport http vercel https://mcp.vercel.com || warn "could not add the Vercel MCP; run: claude mcp add --scope user --transport http vercel https://mcp.vercel.com"
 fi
 
+# ---- 3a5. Design MCPs for Claude Code: Playwright (screenshots), shadcn (components), Context7 (library docs)
+if have claude && have npx; then
+  mcp_have=$(claude mcp list 2>/dev/null || true)
+  echo "$mcp_have" | grep -qi '^playwright' || run claude mcp add --scope user playwright -- npx @playwright/mcp@latest || warn "could not add the Playwright MCP"
+  echo "$mcp_have" | grep -qi '^shadcn' || run claude mcp add --scope user shadcn -- npx shadcn@latest mcp || warn "could not add the shadcn MCP"
+  echo "$mcp_have" | grep -qi '^context7' || run claude mcp add --scope user context7 -- npx -y @upstash/context7-mcp || warn "could not add the Context7 MCP"
+fi
+
 # ---- 3b. Rex terminal ------------------------------------------------------------------------
 if printf '%s' " $PKGS " | grep -q ' rex '; then
   step "3b Rex terminal"
