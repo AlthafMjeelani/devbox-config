@@ -54,6 +54,7 @@ description: Use when managing git workflows, reviewing status and diffs, crafti
 - Never edit or commit on the default branch; create a branch first.
 - Reuse the current unmerged local feature branch when that does not affect others; do not create extra branches.
 - On local feature branches, commit, rebase onto the default branch, push (`git push -u origin <branch>`) and open or update PRs without asking again.
+- After every branch is merged or rebased into the default branch, delete it locally and on the remote (see `branch-cleanup`).
 - Never push to the deploy branch (`main`, `master`, `production`, `release/*` or whatever branch triggers a deploy); push is blocked there, open a PR instead and let the user merge.
 - Only force-push a feature branch after a rebase, with `--force-with-lease`, and only on your own unshared branch.
 - Do not include agent names as co-authors or add automated tool trailers unless requested.
