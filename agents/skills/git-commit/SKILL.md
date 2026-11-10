@@ -3,6 +3,9 @@ name: git-commit
 description: Use when creating git commits, drafting commit messages, branch names, or concise git summaries from staged or unstaged changes.
 ---
 ## Procedure
+- Check the branch first with `git branch --show-current`.
+- If it is `main`, `master`, `develop` or the default branch, do not commit there; create a new branch with `git switch -c <type>/<topic>` first.
+- If already on a local feature branch that is not yet merged or rebased, commit there; do not create extra branches unless that would affect others (pushed or shared branch, open PR under review, unrelated work).
 - Inspect staged changes first. If the command context lists multiple repositories, inspect the staged changes for each listed repository.
 - For `/commit` or an explicit commit request, create commits from staged changes after choosing the message.
 - If the current directory is not a git repository but contains child repositories or submodules, treat `/commit` as "commit all listed repositories with staged changes" instead of failing.
@@ -19,6 +22,7 @@ description: Use when creating git commits, drafting commit messages, branch nam
 - Mark breaking changes with `!` in the subject and `BREAKING CHANGE:` in the body.
 - Warn if secrets, generated artifacts, lockfiles, or unrelated changes appear.
 - After committing, verify with `git status --short` or `git -C <repo> status --short` for each committed repository.
+- Commits and pushes on local feature branches are allowed without asking again; pushing to the deploy branch (`main`, `master`, `production`, `release/*`) is blocked.
 - Do not amend commits unless the user explicitly requested amend.
 - Use multi-line commit commands so the body is preserved, for example:
   ```bash
