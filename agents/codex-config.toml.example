@@ -13,6 +13,10 @@ tool_output_token_limit = 12000
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 
+# Rex terminal control (rex CLI over a unix socket) needs network access.
+[sandbox_workspace_write]
+network_access = true
+
 # Profiles: one flag switches model and effort. Do not switch models mid-session (breaks prompt caching).
 [profiles.fast]
 model = "gpt-6-luna"
