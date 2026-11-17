@@ -36,7 +36,7 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 
 ## What you get
 
-**One skill set for every agent.** All 141 skills live in `agents/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
+**One skill set for every agent.** All 156 skills live in `agents/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
 
 **A macOS menu bar** (SwiftBar) with two plugins:
 
@@ -104,6 +104,26 @@ Edit `agents/AGENTS.md`, commit, and every agent picks it up on its next session
 | `swiftbar/` | macOS menu bar plugins |
 | `scripts/` | CLI tools |
 | `docs/`, `tests/` | Docs and workflow tests |
+
+## DevOps, developer and designer skills
+
+| Skill | Use it for |
+|---|---|
+| `docker-containerization` | Dockerfiles, multi-stage builds, Compose, image scanning |
+| `kubernetes-ops` | Manifests, Helm, probes, rollouts, pod debugging |
+| `terraform-iac` | Terraform or OpenTofu plans, state, modules, drift |
+| `github-actions-ci` | Workflows, caching, OIDC, least-privilege permissions |
+| `observability-and-monitoring` | Logs, metrics, traces, SLOs, alerts |
+| `incident-response-runbooks` | Triage, comms, runbooks, postmortems |
+| `deployment-strategies` | Rolling, blue-green, canary, flags, rollback |
+| `linux-server-hardening` | SSH, firewall, nginx, TLS, systemd, backups |
+| `secrets-and-supply-chain` | Secret rotation, scanning, SBOM, pinning |
+| `dependency-upgrade` | Safe, verified dependency and runtime upgrades |
+| `web-performance-optimization` | Core Web Vitals, bundles, images, caching |
+| `monorepo-and-build-tooling` | Workspaces, Turborepo or Nx, build caching |
+| `ux-research-and-flows` | Users, jobs, flows and wireframes before visuals |
+| `typography-and-color-systems` | Type scales, palettes, contrast-safe tokens |
+| `ux-writing-microcopy` | Buttons, errors, empty states and UI text |
 
 ## Skills added for full-stack and design work
 
