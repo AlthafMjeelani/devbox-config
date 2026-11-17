@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""skills-zip - package shared skills as .zip files for upload to the Claude app (claude.ai).
+
+  skills-zip [--out DIR] [skill ...]    default out: ./dist/claude-app-skills, default: every eligible skill
+
+Upload each zip in Claude: Settings > Capabilities > Skills > Upload skill.
+Skipped with a reason: names containing "claude" or "anthropic", descriptions over 1024 characters,
+frontmatter problems, and skills that need local CLIs (crew, gate, rex, ai-usage, git-wt).
+"""
+import re, sys, zipfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[3] / "agents" / "skills"
+LOCAL_ONLY = {"crew", "ship-gate", "gate-review", "rex-terminal", "agent-orchestration", "agent-communication",
+              "agent-cost-review", "model-routing", "token-budget-manager", "branch-cleanup", "repo-agentic-setup",
+              "init-agents-md", "project-agents-md", "agent-browser", "browser", "find-skills", "skill-creator", "missing-skill-handling"}
+
+def meta(text):
+    m = re.match(r"---\n(.*?)\n---", text, re.S)
+    if not m: return None, None
+    fm = m.group(1)
+    n = re.search(r"^name:\s*(.+)$", fm, re.M)
+    d = re.search(r"^description:\s*(?:[>|][-+]?\s*\n((?:[ \t]+.*\n?)+)|(.+))$", fm, re.M)
+    desc = None
+    if d: desc = " ".join((d.group(1) or d.group(2)).split()).strip("\"'")
+    return (n.group(1).strip().strip("\"'") if n else None), desc
+
+def main(argv):
+    out = Path("dist/claude-app-skills"); names = []
+    it = iter(argv)
+    for a in it:
+        if a == "--out": out = Path(next(it))
+        elif a in ("-h", "--help"): print(__doc__); return 0
+        else: names.append(a)
+    out.mkdir(parents=True, exist_ok=True)
+    done, skipped = 0, []
+    for d in sorted(p for p in ROOT.iterdir() if p.is_dir() and not p.name.startswith(".")):
+        if names and d.name not in names: continue
+        f = d / "SKILL.md"
+        name, desc = meta(f.read_text(errors="ignore")) if f.exists() else (None, None)
+        why = None
+        if not name or not desc: why = "bad frontmatter"
+        elif re.search(r"claude|anthropic", d.name): why = "name contains claude/anthropic"
+        elif len(desc) > 1024: why = f"description {len(desc)} chars (max 1024)"
+        elif d.name in LOCAL_ONLY: why = "needs local CLIs or agent files"
+        if why: skipped.append((d.name, why)); continue
+        z = out / f"{d.name}.zip"
+        with zipfile.ZipFile(z, "w", zipfile.ZIP_DEFLATED) as zf:
+            for p in sorted(d.rglob("*")):
+                if p.is_file() and not p.is_symlink(): zf.write(p, Path(d.name) / p.relative_to(d))
+        done += 1
+    print(f"wrote {done} zips to {out}")
+    for n, w in skipped: print(f"skipped {n}: {w}")
+    return 0
+
+sys.exit(main(sys.argv[1:]))

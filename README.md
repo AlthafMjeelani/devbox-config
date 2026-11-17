@@ -21,6 +21,7 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 | Update this machine | `git pull && ./setup.sh -y` |
 | Check everything is healthy | `make verify-agent-workflow` |
 | Add or change a skill | edit `agents/skills/<name>/SKILL.md`, then `make agents-sync && make restow` |
+| Use the skills in the Claude app (claude.ai) | `make skills-zip`, then upload each zip in Settings > Capabilities > Skills |
 | Install only some parts | `make stow PKG="agents opencode nvim"` |
 | Remove a part | `make unstow PKG="nvim"` |
 | Also set up the zsh config | `./setup.sh --shell` |

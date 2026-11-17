@@ -94,3 +94,6 @@ unstow-%:
 
 restow-%:
 	$(STOW) -d $(DIR) -t $(TARGET) $(STOW_FLAGS) -R $*
+
+skills-zip:
+	./scripts/.local/bin/skills-zip
