@@ -38,6 +38,9 @@ Before finishing:
 - For parallel agents, give each its own worktree and branch (`git-wt`, `crew`).
 - This is enforced: commits and (in Claude Code) edits on the default branch are blocked with a message. If you see "Blocked: you are on 'main'", run `git switch -c feat/<topic>` and continue. Do not bypass it with `ALLOW_DEFAULT_BRANCH` unless the user says to.
 
+## Missing skills
+- If no skill fits the task, finish the work anyway, then follow `missing-skill-handling` to find, extend or propose a new skill. Do not commit or push it without asking.
+
 ## Mobile apps
 - For any mobile app request, use Flutter. Start with `mobile-app-development`, which routes to `senior-flutter-engineer`, `flutter-ui-ux-design`, `flutter-native-and-release` and `design-mobile-apps`.
   Use another stack only when the project already uses it or the user names it.
