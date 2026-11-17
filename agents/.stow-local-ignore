@@ -6,3 +6,6 @@ design-skills.sources.json
 
 # Canonical skill store: not stowed as ~/skills. Each agent gets a directory symlink instead (e.g. agents/.claude/skills).
 ^/skills
+
+OPINIONS.md.example
+VOICE.md.example

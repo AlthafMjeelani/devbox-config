@@ -1,7 +1,57 @@
 {
   "amp.gauge": "cost",
   "amp.remoteThreadCreation.enabled": true,
-  "amp.permissions": [],
+  "amp.permissions": [
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push*"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git reset --hard*"
+      },
+      "action": "ask"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git clean*"
+      },
+      "action": "ask"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "rm -rf*"
+      },
+      "action": "ask"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git status*"
+      },
+      "action": "allow"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git diff*"
+      },
+      "action": "allow"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git log*"
+      },
+      "action": "allow"
+    }
+  ],
   "amp.git.commit.coauthor.enabled": false,
   "amp.git.commit.ampThread.enabled": true,
   "amp.notifications.enabled": true,

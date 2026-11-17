@@ -1,0 +1,13 @@
+# Opinions
+
+Copy to `~/OPINIONS.md`.
+Agents read this when a decision depends on your viewpoint (see `agents/AGENTS.md`).
+Keep it short and concrete.
+
+## Engineering
+- Preferred stacks and libraries, and what you avoid.
+- Trade-off defaults (for example quality over speed, simple over clever).
+
+## Business and proposals
+- Pricing, scope, AMC and delivery preferences.
+- Deal-breakers.

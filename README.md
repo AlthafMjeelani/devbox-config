@@ -36,7 +36,7 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 
 ## What you get
 
-**One skill set for every agent.** All 142 skills live in `agents/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
+**One skill set for every agent.** All 141 skills live in `agents/skills/` and are linked into each agent's own skills folder, so a skill added once works in Claude Code, Codex, OpenCode, Kimi, Amp, CommandCode and Antigravity. Just describe the task in plain words; agents pick the skill by its description, or name one: "use the admin-panel-dashboard-design skill".
 
 **A macOS menu bar** (SwiftBar) with two plugins:
 
@@ -77,7 +77,8 @@ If Rex says the CLI is not allowed, turn on Remote Control in Rex settings. `rex
 |---|---|---|
 | `agents/AGENTS.md` (this repo) | every agent, every project, via `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and the other links | the **coding workflow** (read the project's `AGENTS.md` first, always work on a feature branch), safety, commits, quality bar |
 | `AGENTS.md` in each project repo | that project only | stack, commands, conventions, folder map, branch and PR rules for the team |
-| `agents/.claude/settings.json`, `agents/.codex/rules/default.rules` | one tool | hard permissions, for example denying `git push` |
+| `agents/.claude/settings.json`, `agents/.codex/rules/default.rules`, `amp/.config/amp/settings.json` | one tool | hard permissions: `git push` is denied in Claude Code, Codex and Amp; `make verify-agent-workflow` fails if that regresses |
+| `~/OPINIONS.md`, `~/VOICE.md` | your machine only | personal context agents read when deciding or writing as you; copy from `agents/OPINIONS.md.example` and `agents/VOICE.md.example` |
 
 **Enforced, not just asked.** `guard-default-branch` blocks work on `main`, `master`, `develop`, `trunk` and a repo's default branch in two places:
 
