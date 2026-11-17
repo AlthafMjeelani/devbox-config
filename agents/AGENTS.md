@@ -31,6 +31,7 @@ While coding:
 - Run the project's lint, typecheck and tests, and fix what your change broke.
 
 Before finishing:
+- Run the `verify-task` skill and base your report on its output.
 - Review your own `git diff` and remove stray edits.
 - Report what changed, what you verified (with command output) and what you did not.
 - Leave the work committed on the feature branch only if asked. Do not push, merge or open a PR unless asked.
