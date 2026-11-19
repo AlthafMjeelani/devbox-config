@@ -60,6 +60,8 @@ Before finishing:
 - Conventional-commit style subjects (`feat:`, `fix:`, `chore:` ...).
 - Commit or push only when asked. All work happens on a feature branch (see Coding workflow), never on the default branch.
 - Never auto-add the agent name as a co-author or `Co-Authored-By` trailer.
+- Merging (only when asked) always means rebase onto the default branch, then fast-forward; never a merge commit.
+  After it succeeds, delete the finished branch with `branch-cleanup`.
 
 ## Quality bar
 - No half-done work. If tests fail or a step is skipped, say so plainly with the output.

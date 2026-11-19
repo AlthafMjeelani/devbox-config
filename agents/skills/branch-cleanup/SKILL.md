@@ -1,7 +1,18 @@
 ---
 name: branch-cleanup
-description: Use after a feat/fix/chore branch is successfully rebased or merged into the default branch, to delete the finished local and remote branch safely.
+description: Use when merging a feat/fix/chore branch into the default branch (always rebase first, then fast-forward) and right after a successful rebase or merge, to delete the finished local and remote branch safely.
 ---
+## Merge policy: rebase first, always
+- Every merge into the default branch is a rebase followed by a fast-forward. Never create a merge commit unless the user explicitly asks for one.
+- Update the default branch first: `git fetch origin && git switch <default> && git pull --ff-only`.
+- Rebase the topic branch onto it: `git switch <branch> && git rebase <default>`. If the branch is checked out in another worktree, run the rebase there.
+- On conflicts, resolve them, `git add` the files and `git rebase --continue`. If the resolution is unclear, run `git rebase --abort` and ask.
+- Re-run the project's lint, tests and build on the rebased branch before merging.
+- Fast-forward the default branch: `git switch <default> && git merge --ff-only <branch>`. If `--ff-only` fails, rebase again; never fall back to a plain merge.
+- If the branch was already pushed, update it with `git push --force-with-lease` (never plain `--force`) before or instead of merging through a PR.
+- Push the default branch only when the user asked to push.
+- Then run the cleanup procedure below in the same session.
+
 ## Procedure
 - Always run this after every successful merge or rebase of a topic branch; deleting the finished branch is the default, no extra ask needed.
 - Run only after a rebase or merge into the default branch (main/master/develop) has succeeded. Never delete before that.
