@@ -4,16 +4,19 @@
 #   guard-default-branch check [dir]          Exit 1 with a message if dir is on a protected branch.
 #   guard-default-branch claude-hook          Claude Code PreToolUse hook: reads the tool call JSON on stdin,
 #                                             exits 2 (block) when the file being edited is on a protected branch.
+#   guard-default-branch claude-push-hook     Claude Code PreToolUse hook for Bash: exits 2 (block) when a git push
+#                                             targets (or deletes) a protected branch.
 #   guard-default-branch install-claude-hook  Merge that hook into ~/.claude/settings.json (idempotent, keeps a backup).
 #
 # Protected: main, master, develop, trunk, and the repo's own default branch (origin/HEAD).
+# Never protected: dev and staging. Agents may commit on them and push to them directly.
 # Allow on purpose:  ALLOW_DEFAULT_BRANCH=1 <command>      one time
 #                    git config devbox.allowDefaultBranch true   for one repo (for example your dotfiles)
 set -euo pipefail
 
 protected() {
   local branch="$1" dir="$2" default
-  case "$branch" in main|master|develop|trunk) return 0 ;; esac
+  case "$branch" in dev|staging) return 1 ;; main|master|develop|trunk) return 0 ;; esac
   default="$(git -C "$dir" symbolic-ref --short -q refs/remotes/origin/HEAD 2>/dev/null || true)"
   [ -n "$default" ] && [ "$branch" = "${default#origin/}" ]
 }
@@ -49,26 +52,110 @@ claude_hook() {
   check "$dir" || exit 2
 }
 
+# Print the branches a `git push` argument list would update or delete, one per line ("*" for --all/--mirror).
+push_targets() {
+  local dir="$1"; shift
+  local positional=() arg dst current upstream
+  while [ $# -gt 0 ]; do
+    arg="$1"; shift
+    case "$arg" in
+      --all|--mirror|--branches) echo '*' ;;
+      -o|--push-option|--repo|--receive-pack|--exec) shift ;;
+      -*) ;;
+      *) positional+=("$arg") ;;
+    esac
+  done
+  if [ "${#positional[@]}" -le 1 ]; then   # no refspec: push.default pushes the current branch (or its upstream)
+    current="$(git -C "$dir" symbolic-ref --short -q HEAD 2>/dev/null || true)"
+    [ -n "$current" ] || return 0
+    upstream="$(git -C "$dir" config --get "branch.$current.merge" 2>/dev/null || true)"
+    echo "$current"
+    [ -z "$upstream" ] || echo "${upstream#refs/heads/}"
+    return 0
+  fi
+  for arg in "${positional[@]:1}"; do
+    arg="${arg#+}"; dst="${arg##*:}"
+    [ -n "$dst" ] && [ "$dst" != HEAD ] || dst="$(git -C "$dir" symbolic-ref --short -q HEAD 2>/dev/null || true)"
+    echo "${dst#refs/heads/}"
+  done
+}
+
+# Check every `git ... push ...` in a shell command line. Returns 1 and explains when one hits a protected branch.
+push_check() {
+  local cmd="$1" dir="$2" segment target
+  local -a words
+  cmd="${cmd//&&/;}"; cmd="${cmd//||/;}"; cmd="${cmd//|/;}"; cmd="${cmd//$'\n'/;}"
+  local IFS=';'
+  for segment in $cmd; do
+    IFS=$' \t' read -r -a words <<< "$segment"
+    [ "${#words[@]}" -gt 0 ] || continue
+    if [ "${words[0]}" = cd ] && [ -n "${words[1]:-}" ]; then
+      case "${words[1]}" in /*) dir="${words[1]}" ;; "~"*) dir="$HOME${words[1]#\~}" ;; *) dir="$dir/${words[1]}" ;; esac
+      continue
+    fi
+    [ "${words[0]##*/}" = git ] || continue
+    local i=1
+    while [ $i -lt ${#words[@]} ]; do
+      case "${words[$i]}" in
+        -C) i=$((i + 1)); case "${words[$i]:-}" in /*) dir="${words[$i]}" ;; *) dir="$dir/${words[$i]:-}" ;; esac ;;
+        -c) i=$((i + 1)) ;;
+        -*) ;;
+        *) break ;;
+      esac
+      i=$((i + 1))
+    done
+    [ "${words[$i]:-}" = push ] || continue
+    while IFS= read -r target; do
+      [ -n "$target" ] || continue
+      if [ "$target" = '*' ] || protected "$target" "$dir"; then
+        allowed "$dir" && continue
+        cat >&2 <<MSG
+Blocked: this push updates '$target', a protected branch. Push a feature branch, or dev/staging, instead.
+Ask the user to push protected branches themselves.  Per repo: git config devbox.allowDefaultBranch true
+MSG
+        return 1
+      fi
+    done < <(push_targets "$dir" "${words[@]:$((i + 1))}")
+  done
+  return 0
+}
+
+claude_push_hook() {
+  command -v jq >/dev/null 2>&1 || exit 0
+  local input cmd dir
+  input="$(cat)"
+  cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null || true)"
+  case "$cmd" in *push*) ;; *) exit 0 ;; esac
+  dir="$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null || true)"
+  push_check "$cmd" "${dir:-$PWD}" || exit 2
+}
+
 install_claude_hook() {
   command -v jq >/dev/null 2>&1 || { echo "jq is required" >&2; exit 1; }
   local file="$HOME/.claude/settings.json" real tmp
   mkdir -p "$HOME/.claude"
   [ -e "$file" ] || echo '{}' > "$file"
   real="$(readlink -f "$file")"
-  if jq -e '[.hooks.PreToolUse[]?.hooks[]?.command] | any(test("guard-default-branch"))' "$real" >/dev/null 2>&1; then
-    echo "Claude hook already installed."; return 0
+  if jq -e '[.hooks.PreToolUse[]?.hooks[]?.command] | (any(test("guard-default-branch claude-hook")) and any(test("guard-default-branch claude-push-hook")))' "$real" >/dev/null 2>&1; then
+    echo "Claude hooks already installed."; return 0
   fi
   cp "$real" "$real.bak-guard"
   tmp="$(mktemp)"
-  jq '.hooks.PreToolUse = ((.hooks.PreToolUse // []) + [{"matcher":"Edit|Write|MultiEdit|NotebookEdit","hooks":[{"type":"command","command":"~/.local/bin/guard-default-branch claude-hook","timeout":10}]}])' "$real" > "$tmp"
+  jq '
+    def add($matcher; $cmd):
+      if ([.hooks.PreToolUse[]?.hooks[]?.command] | any(. == $cmd)) then .
+      else .hooks.PreToolUse = ((.hooks.PreToolUse // []) + [{"matcher":$matcher,"hooks":[{"type":"command","command":$cmd,"timeout":10}]}]) end;
+    add("Edit|Write|MultiEdit|NotebookEdit"; "~/.local/bin/guard-default-branch claude-hook")
+    | add("Bash"; "~/.local/bin/guard-default-branch claude-push-hook")' "$real" > "$tmp"
   cat "$tmp" > "$real"; rm -f "$tmp"
-  echo "Installed the Claude Code hook (backup: $real.bak-guard)."
+  echo "Installed the Claude Code hooks (backup: $real.bak-guard)."
 }
 
 case "${1:-}" in
   check) shift; check "${1:-.}" ;;
   claude-hook) claude_hook ;;
+  claude-push-hook) claude_push_hook ;;
   install-claude-hook) install_claude_hook ;;
-  -h|--help|help|"") sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h|--help|help|"") sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) echo "unknown command: $1 (try --help)" >&2; exit 2 ;;
 esac

@@ -20,6 +20,7 @@ Before changing any code:
    Follow them over these defaults. If none exist, say so and infer commands from `package.json`, `Makefile`, `pubspec.yaml`, `go.mod` and similar.
 2. Check `git status` and the current branch.
    Never edit on `main`, `master`, `develop` or the repo's default branch. Create or switch to a feature branch first.
+   `dev` and `staging` are not restricted: you may work, commit and push on them directly, even when one is the default branch.
    Name it by intent: `feat/<topic>`, `fix/<topic>`, `chore/<topic>`, `docs/<topic>`, `refactor/<topic>`.
    If the current branch holds unrelated work, start a new branch from the default branch (or ask).
    If there are uncommitted changes you did not make, stop and surface them.
@@ -36,7 +37,7 @@ Before finishing:
 - Report what changed, what you verified (with command output) and what you did not.
 - Leave the work committed on the feature branch only if asked. Do not push, merge or open a PR unless asked.
 - For parallel agents, give each its own worktree and branch (`git-wt`, `crew`).
-- This is enforced: commits and (in Claude Code) edits on the default branch are blocked with a message. If you see "Blocked: you are on 'main'", run `git switch -c feat/<topic>` and continue. Do not bypass it with `ALLOW_DEFAULT_BRANCH` unless the user says to.
+- This is enforced: commits and (in Claude Code) edits on the default branch, and pushes to `main`, `master`, `develop` or `trunk`, are blocked with a message. If you see "Blocked: you are on 'main'", run `git switch -c feat/<topic>` and continue. Do not bypass it with `ALLOW_DEFAULT_BRANCH` unless the user says to.
 
 ## Missing skills
 - If no skill fits the task, finish the work anyway, then follow `missing-skill-handling` to find, extend or propose a new skill. Do not commit or push it without asking.
@@ -51,14 +52,15 @@ Before finishing:
 - Every repo carries the standard agentic files (AGENTS.md, docs/ARCHITECTURE, DECISIONS, SKILLS, PLAN, .env.example). If any are missing, run `agentic-init` on a feature branch (see `repo-agentic-setup`) and keep them updated with the code.
 
 ## Safety
-- Confirm before hard-to-reverse or outward-facing actions (push, deploy, delete, send).
-- Never auto-push, auto-merge, or enable yolo / skip-permission modes on your own.
+- Confirm before hard-to-reverse or outward-facing actions (push, deploy, delete, send). Pushing to `dev` or `staging` needs no confirmation.
+- Never push to `main`, `master`, `develop` or `trunk` yourself. Never auto-merge or enable yolo / skip-permission modes on your own.
   Exception: when the user says to give, ask or hand a task to Codex, run Codex with `--yolo` (see Multi-agent work).
 - Before deleting or overwriting, look at the target; if it contradicts expectations, stop and surface it.
 
 ## Commits
 - Conventional-commit style subjects (`feat:`, `fix:`, `chore:` ...).
-- Commit or push only when asked. All work happens on a feature branch (see Coding workflow), never on the default branch.
+- Commit only when asked. All work happens on a feature branch (see Coding workflow), never on the default branch, unless that branch is `dev` or `staging`.
+- Push to `dev` and `staging` directly. Push other branches only when asked.
 - Never auto-add the agent name as a co-author or `Co-Authored-By` trailer.
 - Merging (only when asked) always means rebase onto the default branch, then fast-forward; never a merge commit.
   After it succeeds, delete the finished branch with `branch-cleanup`.

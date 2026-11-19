@@ -42,6 +42,51 @@ describe("guard-default-branch check", () => {
   });
 });
 
+describe("dev and staging are never protected", () => {
+  test("check allows dev and staging, even as the repo's default branch", () => {
+    for (const b of ["dev", "staging"]) {
+      const dir = newRepo(b);
+      sh(`git remote add origin https://example.invalid/r.git && git update-ref refs/remotes/origin/${b} HEAD && git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/${b}`, dir);
+      expect(sh(`${guard} check .`, dir).code).toBe(0);
+    }
+  });
+});
+
+describe("claude-push-hook", () => {
+  const push = (dir: string, command: string) => sh(`${guard} claude-push-hook`, dir, {}, JSON.stringify({ cwd: dir, tool_input: { command } }));
+  test("allows pushes to dev, staging and feature branches", () => {
+    const dir = newRepo("dev");
+    for (const c of ["git push origin dev", "git push -u origin staging", "git push", "git push --force-with-lease origin feat/x", "git push origin --delete feat/x", "git status", "echo push"]) {
+      expect([c, push(dir, c).code]).toEqual([c, 0]);
+    }
+  });
+  test("blocks pushes that update or delete protected branches, in any form", () => {
+    const dir = newRepo("feat/x");
+    for (const c of [
+      "git push origin main",
+      "git push -f origin master",
+      "git push origin HEAD:develop",
+      "git push origin +feat/x:main",
+      "git push origin --delete main",
+      "git push --all origin",
+      `git -C ${dir} push origin trunk`,
+      "git --no-pager push origin main",
+      "cd . && git push origin main",
+    ]) {
+      expect([c, push(dir, c).code]).toEqual([c, 2]);
+    }
+    expect(push(dir, "git push origin main").err).toContain("protected branch");
+  });
+  test("a bare push from a protected branch is blocked", () => {
+    expect(push(newRepo("main"), "git push").code).toBe(2);
+  });
+  test("per-repo override allows protected pushes", () => {
+    const dir = newRepo("main");
+    sh("git config devbox.allowDefaultBranch true", dir);
+    expect(push(dir, "git push origin main").code).toBe(0);
+  });
+});
+
 describe("claude-hook", () => {
   const call = (dir: string, file: string) => sh(`${guard} claude-hook`, dir, {}, JSON.stringify({ tool_input: { file_path: file } }));
   test("blocks edits on main with exit 2, including new files in new folders", () => {
@@ -91,7 +136,9 @@ describe("install-claude-hook", () => {
     const s = JSON.parse(readFileSync(file, "utf8"));
     expect(s.theme).toBe("dark");
     expect(s.hooks.Stop).toHaveLength(1);
-    expect(s.hooks.PreToolUse).toHaveLength(1);
+    expect(s.hooks.PreToolUse).toHaveLength(2);
     expect(s.hooks.PreToolUse[0].matcher).toContain("Edit");
+    expect(s.hooks.PreToolUse[1].matcher).toBe("Bash");
+    expect(s.hooks.PreToolUse[1].hooks[0].command).toContain("claude-push-hook");
   });
 });

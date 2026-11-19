@@ -44,16 +44,17 @@ for (const directory of readdirSync(skillsRoot, { withFileTypes: true }).filter(
   if (lines > 500) failure(`${file} has ${lines} lines (max 500); move detail into references/`);
 }
 
-// Enforced policy: the repo must keep denying push and blocking the default branch.
+// Enforced policy: agents may push dev/staging, but never protected branches; the default branch stays guarded.
 try {
   const claude = JSON.parse(readFileSync(join(repo, "agents/.claude/settings.json"), "utf8"));
-  if (!claude.permissions?.deny?.some((rule: string) => rule.startsWith("Bash(git push"))) failure("agents/.claude/settings.json must deny git push");
+  if (!claude.permissions?.deny?.includes("Bash(git push origin main)")) failure("agents/.claude/settings.json must deny pushing main");
+  if (!JSON.stringify(claude.hooks ?? {}).includes("guard-default-branch claude-push-hook")) failure("agents/.claude/settings.json is missing the push guard hook");
   if (!JSON.stringify(claude.hooks ?? {}).includes("guard-default-branch")) failure("agents/.claude/settings.json is missing the guard-default-branch hook");
 } catch (error) {
   failure(`agents/.claude/settings.json missing or invalid: ${error}`);
 }
 const codexRules = readFileSync(join(repo, "agents/.codex/rules/default.rules"), "utf8");
-if (!/pattern = \["git", "push"\],\s*decision = "forbidden"/.test(codexRules)) failure("default.rules must forbid git push");
+if (!/pattern = \["git", "push", "origin", \["main"[^\]]*\]\],\s*decision = "forbidden"/.test(codexRules)) failure("default.rules must forbid pushing main");
 if (/\/private\/tmp|\/Users\//.test(codexRules)) failure("default.rules contains machine-specific paths");
 
 for (const file of [

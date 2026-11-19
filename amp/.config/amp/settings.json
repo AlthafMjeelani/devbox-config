@@ -5,9 +5,121 @@
     {
       "tool": "Bash",
       "matches": {
-        "cmd": "git push*"
+        "cmd": "git push origin dev"
+      },
+      "action": "allow"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push -u origin dev"
+      },
+      "action": "allow"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push origin staging"
+      },
+      "action": "allow"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push -u origin staging"
+      },
+      "action": "allow"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push* main"
       },
       "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push* main *"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push*:main*"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push* master"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push* master *"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push*:master*"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push* develop"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push* develop *"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push*:develop*"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push* trunk"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push* trunk *"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push*:trunk*"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push*"
+      },
+      "action": "ask"
     },
     {
       "tool": "Bash",

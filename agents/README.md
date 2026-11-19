@@ -101,7 +101,7 @@ This package owns `~/.claude/settings.json`.
 It merges the live settings with permission parity and the statusline command:
 
 - allow `git status`, `git diff`, `git log`, and common test runners without prompting
-- deny `git push`
+- allow pushes to `dev` and `staging`; deny pushes to `main`, `master`, `develop` and `trunk` (other pushes prompt)
 - run `~/.local/bin/claude-statusline` for the status line
 
 Write-through the symlink is desired dotfiles behavior: Claude `/config` edits should land in this repo and show in `git diff`.
@@ -129,7 +129,7 @@ Do not copy `[projects."..."]` `trust_level` entries, TUI NUX state, credentials
 Codex recreates trust entries when you explicitly trust each project.
 
 The package includes `agents/.codex/rules/default.rules` using Codex `prefix_rule()` syntax.
-It allows git status/diff/log and common test runners, forbids `git push`, and leaves everything else to the approval policy.
+It allows git status/diff/log and common test runners, allows pushes to `dev`/`staging`, forbids pushes to `main`/`master`/`develop`/`trunk`, and leaves everything else to the approval policy.
 Codex discovers user skills from `~/.agents/skills`.
 Keep that path as a real directory so `agents-sync` can link the shared skills alongside third-party skills without replacing them.
 The legacy `~/.codex/skills` path is not managed by this package.

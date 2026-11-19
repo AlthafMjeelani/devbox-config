@@ -77,13 +77,14 @@ If Rex says the CLI is not allowed, turn on Remote Control in Rex settings. `rex
 |---|---|---|
 | `agents/AGENTS.md` (this repo) | every agent, every project, via `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and the other links | the **coding workflow** (read the project's `AGENTS.md` first, always work on a feature branch), safety, commits, quality bar |
 | `AGENTS.md` in each project repo | that project only | stack, commands, conventions, folder map, branch and PR rules for the team |
-| `agents/.claude/settings.json`, `agents/.codex/rules/default.rules`, `amp/.config/amp/settings.json` | one tool | hard permissions: `git push` is denied in Claude Code, Codex and Amp; `make verify-agent-workflow` fails if that regresses |
+| `agents/.claude/settings.json`, `agents/.codex/rules/default.rules`, `amp/.config/amp/settings.json` | one tool | hard permissions: pushes to `dev`/`staging` are allowed and pushes to `main`/`master`/`develop`/`trunk` are denied in Claude Code, Codex, Amp and OpenCode; `make verify-agent-workflow` fails if that regresses |
 | `~/OPINIONS.md`, `~/VOICE.md` | your machine only | personal context agents read when deciding or writing as you; copy from `agents/OPINIONS.md.example` and `agents/VOICE.md.example` |
 
-**Enforced, not just asked.** `guard-default-branch` blocks work on `main`, `master`, `develop`, `trunk` and a repo's default branch in two places:
+**Enforced, not just asked.** `guard-default-branch` blocks work on `main`, `master`, `develop`, `trunk` and a repo's default branch in two places.
+`dev` and `staging` are never blocked, even as a repo's default branch: agents may commit and push on them directly.
 
 - *Git*: a global `pre-commit` hook (`git/.config/git/hooks`) refuses commits on those branches for every agent and for you. Repo-local hooks still run through it.
-- *Claude Code*: a `PreToolUse` hook blocks Edit and Write on those branches, with a message telling the agent to run `git switch -c feat/<topic>`. `./setup.sh` installs it into `~/.claude/settings.json` (a backup is kept); or run `guard-default-branch install-claude-hook`.
+- *Claude Code*: a `PreToolUse` hook blocks Edit and Write on those branches, with a message telling the agent to run `git switch -c feat/<topic>`. `./setup.sh` installs it into `~/.claude/settings.json` (a backup is kept); or run `guard-default-branch install-claude-hook`. A second `PreToolUse` hook on Bash blocks any `git push` that updates or deletes a protected branch (`HEAD:main`, `+x:main`, `--delete main`, `--all`, `git -C`, `cd ... &&`).
 
 Allow it deliberately: `ALLOW_DEFAULT_BRANCH=1 git commit ...` once, or `git config devbox.allowDefaultBranch true` for one repo. Do that in this dotfiles repo if you commit straight to `main` here. Repos that set their own `core.hooksPath` (husky) skip the git hook, but the Claude hook still applies.
 

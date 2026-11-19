@@ -59,9 +59,27 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["git", "push"],
+    pattern = ["git", "push", "origin", ["dev", "staging", "HEAD:dev", "HEAD:staging"]],
+    decision = "allow",
+    justification = "dev and staging are not restricted; agents may push to them directly",
+)
+
+prefix_rule(
+    pattern = ["git", "push", ["-u", "--set-upstream"], "origin", ["dev", "staging"]],
+    decision = "allow",
+    justification = "dev and staging are not restricted; agents may push to them directly",
+)
+
+prefix_rule(
+    pattern = ["git", "push", "origin", ["main", "master", "develop", "trunk", "HEAD:main", "HEAD:master", "HEAD:develop", "HEAD:trunk"]],
     decision = "forbidden",
-    justification = "Never push automatically; ask the user to push explicitly after review",
+    justification = "Never push protected branches; ask the user to push them explicitly after review",
+)
+
+prefix_rule(
+    pattern = ["git", "push", ["-u", "--set-upstream", "-f", "--force", "--force-with-lease"], "origin", ["main", "master", "develop", "trunk"]],
+    decision = "forbidden",
+    justification = "Never push protected branches; ask the user to push them explicitly after review",
 )
 
 prefix_rule(

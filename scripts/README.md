@@ -46,11 +46,12 @@ Exits 1 on any FAIL (tracked `.env`, not ignored, ignored example, real-looking 
 
 ## guard-default-branch - keep agents off main
 
-Blocks commits and Claude Code edits on `main`, `master`, `develop`, `trunk` and a repo's default branch. Used by the global git `pre-commit` hook and a Claude Code `PreToolUse` hook.
+Blocks commits and Claude Code edits on `main`, `master`, `develop`, `trunk` and a repo's default branch, and Claude Code pushes that update those branches. `dev` and `staging` are never protected. Used by the global git `pre-commit` hook and two Claude Code `PreToolUse` hooks.
 
 ```bash
 guard-default-branch check [dir]            # exit 1 on a protected branch
-guard-default-branch install-claude-hook    # merge the hook into ~/.claude/settings.json
+guard-default-branch claude-push-hook       # Bash hook: exit 2 when a git push targets a protected branch
+guard-default-branch install-claude-hook    # merge both hooks into ~/.claude/settings.json
 ALLOW_DEFAULT_BRANCH=1 git commit ...       # one-off override
 git config devbox.allowDefaultBranch true   # allow in one repo
 ```

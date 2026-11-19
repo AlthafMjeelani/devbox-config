@@ -10,14 +10,14 @@ description: Use when merging a feat/fix/chore branch into the default branch (a
 - Re-run the project's lint, tests and build on the rebased branch before merging.
 - Fast-forward the default branch: `git switch <default> && git merge --ff-only <branch>`. If `--ff-only` fails, rebase again; never fall back to a plain merge.
 - If the branch was already pushed, update it with `git push --force-with-lease` (never plain `--force`) before or instead of merging through a PR.
-- Push the default branch only when the user asked to push.
+- Push `dev` or `staging` directly. Push any other default branch (`main`, `master`, `develop`) only when the user asked, and let them run it if the agent's push is blocked.
 - Then run the cleanup procedure below in the same session.
 
 ## Procedure
 - Always run this after every successful merge or rebase of a topic branch; deleting the finished branch is the default, no extra ask needed.
 - Run only after a rebase or merge into the default branch (main/master/develop) has succeeded. Never delete before that.
 - Identify the default branch: `git symbolic-ref --short refs/remotes/origin/HEAD` (fall back to `main`).
-- Only delete topic branches with prefixes `feat/`, `fix/`, `chore/`, `docs/`, `refactor/`, `test/`, `perf/`, `ci/`, `build/`, `hotfix/`. Never delete the default branch, `develop`, `release/*`, or the branch you are currently on.
+- Only delete topic branches with prefixes `feat/`, `fix/`, `chore/`, `docs/`, `refactor/`, `test/`, `perf/`, `ci/`, `build/`, `hotfix/`. Never delete the default branch, `dev`, `staging`, `develop`, `release/*`, or the branch you are currently on.
 - Switch to the default branch and update it: `git checkout <default> && git pull --ff-only`.
 - Verify the work landed before deleting:
   - Merge or fast-forward: `git branch --merged <default>` lists the branch.
