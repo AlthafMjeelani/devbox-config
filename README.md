@@ -67,7 +67,10 @@ rex-agents watch                                     # macOS notification when a
 rex-agents kill api
 ```
 
-Three skills teach your agents the workflow: `agent-orchestration` (plan, dispatch, review, merge), `agent-communication` (handoff files, status signals, ask-or-decide) and `rex-terminal` (the `rex` CLI). They load in all seven agents. To also install Rex's own skill and hook for Claude Code, run `rex skill setup --agent claude`.
+The shared `agent-orchestration`, `agent-communication`, and `crew` skills define dispatch, monitoring, and review.
+Use the bundled `herdr` and `rex-terminal` skills for terminal control.
+The shared herdr skill comes from `herdr --skill` and can be refreshed after upgrading herdr.
+Run `rex skill setup --agent claude --agent codex` to install Rex’s official skill and session hooks.
 
 If Rex says the CLI is not allowed, turn on Remote Control in Rex settings. `rex config check` validates `init.lua`; a binding that Rex rejects can simply be deleted, because Rex works with no config.
 

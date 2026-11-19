@@ -251,6 +251,19 @@ describe("Crew Amp execution", () => {
     expect(command).toContain("--output-format stream-json --verbose");
     expect(command).toContain("jq --unbuffered");
     expect(command).toContain("set -o pipefail");
+    expect(command).toContain("--dangerously-skip-permissions");
+  });
+
+  test("selects native Rex from a Rex pane and honors explicit backend overrides", () => {
+    expect(callCrewFunction("unset HERDR_ENV CREW_BACKEND; REX_SESSION=session:test detect_backend")).toBe("rex");
+    expect(callCrewFunction("HERDR_ENV=1 REX_SESSION=session:test CREW_BACKEND=tmux detect_backend")).toBe("tmux");
+    expect(callCrewFunction("unset CREW_BACKEND; HERDR_ENV=1 REX_SESSION=session:test detect_backend")).toBe("herdr");
+  });
+
+  test("uses the authorized permission flags for headless Codex and Kimi", () => {
+    expect(callCrewFunction("codex_headless_command test standard task")).toContain("--dangerously-bypass-approvals-and-sandbox");
+    expect(callCrewFunction("engine=kimi; model=test; task=task; worker_command")).toContain("kimi --yolo");
+    expect(callCrewFunction("codex_interactive_command test standard")).not.toContain("--dangerously-bypass-approvals-and-sandbox");
   });
 
   test("uses execute mode for Amp headless runs", () => {

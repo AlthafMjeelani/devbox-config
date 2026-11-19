@@ -1,32 +1,26 @@
 ---
 name: crew
 description: Use when orchestrating several agents in parallel - split a request into independent features, dispatch one crewmate per feature with the `crew` CLI, then stop and report status on request (not continuously) so ready branches can be reviewed and shipped.
-compatibility: Requires the local Crew, git-wt, Herdr or tmux, and agent CLI setup. In Amp orbs, use native Amp delegation or separate orb threads instead.
+compatibility: Requires the local Crew, git-wt, Herdr, Rex, or tmux, and agent CLI setup. In Amp orbs, use native Amp delegation or separate orb threads instead.
 ---
 ## What it is
-`crew` runs multiple agents in parallel, each in its own `git wt` worktree and detached tmux
-session or background herdr workspace (backend auto-detected; on herdr a task runs the engine's
-interactive TUI with live status, `--headless` for the bounded non-interactive run).
-You are the **captain**: you plan, dispatch, and monitor - you do not write code
-yourself. Each crewmate implements one feature and commits on its own branch. Crewmates never
-push; the user reviews and ships each ready branch.
+`crew` runs workers in isolated Git worktrees with a Herdr workspace, Rex session, or detached tmux session per worker.
+It records the backend at dispatch so monitoring and cleanup can run from another terminal.
+A job with a task runs headlessly and reports through its log and exit status.
+A branch-only launch starts the engine interactively.
 
 ## When to use
 The user asks to build 2-3 (or more) independent features/fixes at once, or to fan a batch of
 similar changes across a codebase. If the work is a single change, do it directly instead - crew
 is overhead you only want for genuine parallelism.
 
-Before dispatching, verify that `crew`, `git-wt`, the selected agent CLI, and a supported Herdr or tmux backend are available.
+Before dispatching, verify that `crew`, `git-wt`, the selected agent CLI, and a supported Herdr, Rex, or tmux backend are available.
 This is a local-runner workflow and must not be bootstrapped inside an Amp orb.
 In an orb, use the native delegation tools available to Amp for independent work, or create separate orb threads when each task needs its own checkout.
 
-## Native subagents versus crew
-Use native subagents, including Kimi Code's `AgentSwarm` and Amp's `Task` tool, for parallel
-read-only exploration, review, research, or tightly coordinated subtasks that contribute to one
-main-agent result.
-Use `crew` when each task should independently edit, test, and commit a shippable branch.
-Native subagents share the parent workspace and are not a substitute for crew's Git worktree
-isolation. Do not dispatch concurrent editing subagents that may touch the same files.
+## Dispatch routing
+In herdr or Rex, use Crew by default and follow the direct delegation instructions in `agent-orchestration` when the user names Codex or Claude as the worker.
+Follow the host’s native delegation path in an Amp orb.
 
 ## The protocol
 1. **Split** the request into independent features. Each must be shippable on its own and must
@@ -79,21 +73,13 @@ isolation. Do not dispatch concurrent editing subagents that may touch the same 
    `--dangerously-skip-permissions`. Codex uses `gpt-6-luna` with reasoning effort `low` for
    `fast`, `gpt-6.1-terra` for `standard`, and `gpt-6.1-sol` for `deep`; reasoning effort is a
    separate Codex setting and must not be appended to the model slug.
-4. **Report and stop.** After dispatching, tell the user what you launched and how to check in
-   (`crew status`, `crew logs <branch>`, and `crew watch` in a separate pane for push alerts when a
-   crewmate is ready or blocked), then **end your turn and hand control back**. There is no live
-   watcher inside you: do not sit in a `crew status` loop narrating progress - that just spams the
-   user and burns tokens. Reporting is **on request**, not continuous.
-5. **Status on request.** When the user asks how it's going, run `crew status` once (and
-   `crew logs <branch>` if a line needs context), summarize, and stop:
-   ```bash
-   crew status            # branch | running/done(rc) | commits-ahead | last log line
-   crew logs <branch>     # full captured output (-f to follow)
-   ```
-   - **Blocked**: a crewmate that hits an ambiguous requirement prints `BLOCKED: <reason>` and
-     stops. Surface that reason and ask the user how to proceed; do not guess for them.
-   - **Ready**: a crewmate that shows `done` with commits-ahead > 0 is **ready for review**. List
-     the ready branches with a one-line summary each.
+   Tasked Codex, Claude, and Kimi workers use their worker-only permission bypass modes.
+   OpenCode and Amp use their existing automated execution policies.
+4. **Monitor.** Use `crew watch`, `crew status`, and `crew logs <branch>` to follow workers through completion.
+   Resolve routine questions and changes in scope through the orchestrator.
+   Bring the user decisions requiring their authority.
+5. **Review and verify.** Inspect the worker’s diff and run the applicable checks.
+   Report the result to the user from the orchestrator session.
 
 ## Rules
 - Never push or merge. Hand ready branches to the user to review (`/review-diff`) and ship

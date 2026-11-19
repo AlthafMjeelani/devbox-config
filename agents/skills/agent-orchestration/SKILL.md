@@ -8,7 +8,7 @@ description: Plan and run multi-agent workflows - split a goal into independent 
 You are the orchestrator. Workers do bounded tasks; you decompose, dispatch, verify and integrate.
 
 This flow starts automatically whenever a task involves more than one agent (Codex, crew, subagents, parallel workers); the user does not need to ask for it.
-If the goal, the split, the worker choice or the safety of a step is unclear, ask the user before dispatching.
+Resolve routine dispatch decisions yourself and bring the user decisions that require their authority.
 
 ## Flow
 1. **Clarify the goal** and the definition of done (tests, build, behavior).
@@ -16,35 +16,39 @@ If the goal, the split, the worker choice or the safety of a step is unclear, as
 3. **Write a task brief** per worker (template below). One brief, one outcome.
 4. **Dispatch** each worker into its own worktree and session:
    - `crew new "<task>" [--claude|--codex|--kimi|--amp|--commandcode] [--profile fast|standard|deep]` (headless, commits on its own branch, never pushes).
-   - In Rex: `rex-agents spawn <name> -C <worktree> -- claude` then `rex-agents send <name> "<brief pointer>"`.
+   - When the user names Codex or Claude as the worker, use direct delegation below. Otherwise use Crew.
+   - Crew chooses herdr, Rex, or tmux automatically. Load the matching terminal skill when controlling terminal sessions directly.
 5. **Monitor** with `crew status` / `crew watch`, or `rex-agents watch`. Do not poll in a tight loop; wait for finished or blocked events.
 6. **Review** every branch yourself: read the diff, run the tests. A worker's summary is not proof.
-7. **Integrate** in dependency order; resolve conflicts; run the full suite on the merged result.
-8. **Clean up**: stop sessions, remove worktrees you created (`crew stop <branch> -D`).
+7. **Integrate when authorized** in dependency order and run the full suite on the integrated result.
+8. **Clean up** finished sessions and remove worktrees when authorized.
 
-## Delegating to Codex
-When the user says to give, ask or hand a task to Codex, you stay the orchestrator and Codex does the work.
-The user's request is the authorization for `--yolo`; never add it otherwise.
+## Delegating directly to Codex or Claude
+Stay the orchestrator and launch the named engine headlessly.
+Use the authorized permission bypass on the delegated process, and give the worker a brief with scope, checks, and a report destination.
 
-1. **Prepare**: for code changes, give Codex its own worktree and branch (`git worktree add ../<repo>-<topic> -b <type>/<topic>`).
+1. **Prepare**: for code changes, give the named worker its own worktree and branch (`git worktree add ../<repo>-<topic> -b <type>/<topic>`).
    For one-off outputs (images, research, drafts), use a scratch directory.
-   Put reference files (screenshots, specs) in that directory and attach images with `-i`.
-2. **Brief**: write the brief with the template below to `BRIEF.md` in that directory.
-   Name the exact output files Codex must create.
+   Set `worker_dir` to the worktree and `run_dir` to an absolute directory for the brief and logs.
+   Attach Codex reference images with `-i` when needed.
+2. **Brief**: write `BRIEF.md` in `run_dir` using the template below.
+   Assign the worker role explicitly and name the output files the worker must create.
 3. **Run** headless, in the background, with stdin closed (without `</dev/null` Codex waits for stdin and hangs):
    ```bash
-   codex exec --yolo --skip-git-repo-check -C <dir> -i <ref.png> -o <dir>/codex-last.md "$(cat <dir>/BRIEF.md)" </dev/null > <dir>/codex.log 2>&1
+   codex exec --dangerously-bypass-approvals-and-sandbox -C "$worker_dir" -o "$run_dir/result.md" "$(cat "$run_dir/BRIEF.md")" </dev/null > "$run_dir/worker.log" 2>&1 &
+   # Claude uses the worktree as its working directory.
+   (cd "$worker_dir" && claude -p --dangerously-skip-permissions "$(cat "$run_dir/BRIEF.md")") </dev/null > "$run_dir/result.md" 2> "$run_dir/worker.log" &
    ```
    Add `-m <model>` only when `agent-route` says so.
-   Image generation is built in (`codex features list | grep image_generation`); tell Codex to save the image into `<dir>`.
-4. **Monitor**: wait for the background completion; for progress, read `<dir>/codex.log` or the newest `~/.codex/sessions/**/rollout-*.jsonl`.
+   For a Codex scratch task outside Git, add `--skip-git-repo-check`.
+4. **Monitor**: wait for the background completion; for progress, read the worker log or the engine run transcript.
    If nothing changes for about 10 minutes, check the process and stop it rather than waiting indefinitely.
 5. **Review**: open the produced files (look at images, read the diff, run the tests).
-   Codex's summary is not proof.
-6. **Integrate**: apply or adapt the result in the main work, verify it end to end, then report what Codex produced and what you changed.
+6. **Integrate**: apply or adapt the result in the main work, verify it end to end, then report what the worker produced and what you changed.
 7. **Clean up**: remove worktrees you created once their branch is merged or abandoned.
 
-Guardrails still apply under `--yolo`: the brief must forbid push, force-push, history rewrites, `sudo`, deleting files outside its directory and touching secrets.
+The brief reserves push, deployment, history rewrites, destructive actions, and access to secrets for the orchestrator.
+Permission bypass gives the worker the process account’s access. Use OS-level isolation when that access must be constrained.
 
 ## Task brief template
 ```

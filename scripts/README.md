@@ -177,26 +177,17 @@ git wt rm feature-x -D       # remove worktree + branch
 
 ## crew - tmux/herdr multi-agent orchestrator
 
-`crew` runs several agents in parallel, each in its own `git wt` worktree and its own
-background Herdr workspace or detached tmux session. Herdr is the primary local backend and tmux
-is the fallback. This is our own lightweight take on firstmate -
-no daemon, no external scripts. Run it from inside the target repo. The backend is
-auto-detected per crewmate at spawn (herdr inside herdr, tmux inside tmux, else tmux if
-installed; `CREW_BACKEND=tmux|herdr` forces one) and recorded in the state dir, so
-`status`/`attach`/`stop` keep working from anywhere.
-Every tasked crewmate runs headlessly on both Herdr and tmux, then exits when its bounded work is complete.
-A branch-only launch without a task remains interactive.
-A crewmate with a task runs **bounded**: it may
-edit, run tests, and commit on its branch, then stops - it never pushes. Each engine is
-constrained to that effect - auto-approve everything except an explicit deny-list, never a full
-yolo mode: `opencode` via `--agent build --auto` plus a Crew-only global policy inherited by
-delegated subagents (auto-approves edits and routine commands, but still denies `git push`/`sudo`/
-hard-reset/`git clean`/dangerous `rm -rf`; `--auto` is required since headless `run` has no TTY),
-`claude` via `--permission-mode acceptEdits` + a `git push`/`sudo`/hard-reset deny-list, `codex`
-via the `workspace-write` sandbox (network off, so push is blocked), and Kimi Code via print
-mode's auto permission policy plus explicit local-only, non-destructive task guardrails. Amp uses
-minimal execute-mode settings plus the required `workflow-guardrails` plugin, which parses direct
-shell commands and rejects risky operations without false-blocking quoted text.
+Crew runs each worker in its own Git worktree and terminal session.
+Backend selection prefers herdr inside herdr, Rex inside Rex, and tmux elsewhere when available.
+`CREW_BACKEND=herdr|rex|tmux` overrides detection.
+Crew records the selected backend for later status, attachment, and cleanup.
+
+Tasked workers run headlessly and report their logs and exit status.
+Codex, Claude, and Kimi use permission bypass for the delegated process.
+OpenCode and Amp use their automated execution policies, and CommandCode retains its required Crew hook.
+A branch-only launch starts the engine interactively.
+The orchestrator reviews results and handles decisions and outward-facing actions.
+
 Headless Claude runs use its realtime event stream to log concise agent updates and tool activity
 while omitting thinking and verbose tool results, so `crew status` and `crew logs -f` remain useful
 before the task finishes.
