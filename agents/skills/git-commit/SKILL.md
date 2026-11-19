@@ -22,7 +22,7 @@ description: Use when creating git commits, drafting commit messages, branch nam
 - Mark breaking changes with `!` in the subject and `BREAKING CHANGE:` in the body.
 - Warn if secrets, generated artifacts, lockfiles, or unrelated changes appear.
 - After committing, verify with `git status --short` or `git -C <repo> status --short` for each committed repository.
-- Commits and pushes on local feature branches are allowed without asking again; pushing to the deploy branch (`main`, `master`, `production`, `release/*`) is blocked.
+- Commits and pushes on local feature branches are allowed without asking again; pushing to the deploy branch (`main`, `master`, `production`, `release/*`) is blocked. `dev` and `staging` are unrestricted: commit and push to them directly.
 - Do not amend commits unless the user explicitly requested amend.
 - Use multi-line commit commands so the body is preserved, for example:
   ```bash

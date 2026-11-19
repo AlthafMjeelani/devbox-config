@@ -110,6 +110,26 @@ describe("Amp workflow guardrails", () => {
     expect(blockedCommandReason(command)).toBeNull();
   });
 
+  test("interactive sessions push dev and staging without a confirm; everything else still asks", () => {
+    const interactive = { allowUnrestrictedBranchPush: true };
+    for (const command of ["git push origin dev", "git push -u origin staging", "git push origin HEAD:dev", "git -C /tmp/r push origin +feat/x:staging"]) {
+      expect([command, blockedCommandReason(command, interactive)]).toEqual([command, null]);
+    }
+    for (const command of [
+      "git push origin main",
+      "git push",
+      "git push origin dev main",
+      "git push origin --delete dev",
+      "git push -d origin staging",
+      "git push origin :dev",
+      "git push --all origin",
+      "git push origin feat/x",
+    ]) {
+      expect([command, blockedCommandReason(command, interactive)]).not.toEqual([command, null]);
+    }
+    expect(blockedCommandReason("git push origin dev")).not.toBeNull();
+  });
+
   test("allows sandbox-local elevation in Amp orbs without weakening shared-state guards", () => {
     const orbPolicy = { allowSandboxElevation: true };
     expect(blockedCommandReason("sudo apt-get install -y docker", orbPolicy)).toBeNull();

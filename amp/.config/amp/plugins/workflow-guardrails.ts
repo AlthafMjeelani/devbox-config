@@ -76,7 +76,23 @@ function hasShortFlag(args: string[], flag: string) {
 
 type CommandPolicy = {
   allowSandboxElevation?: boolean;
+  /** Interactive (non-Crew) sessions may push to dev and staging without a confirm. */
+  allowUnrestrictedBranchPush?: boolean;
 };
+
+const UNRESTRICTED_BRANCHES = new Set(["dev", "staging"]);
+
+/** True when a push explicitly names a remote and only updates dev and/or staging (no deletes, --all, --mirror). */
+export function pushesOnlyUnrestrictedBranches(args: string[]): boolean {
+  if (hasShortFlag(args, "d") || args.some((arg) => ["--all", "--mirror", "--branches", "--tags", "--delete", "--prune"].includes(arg))) return false;
+  const positional = args.filter((arg) => !arg.startsWith("-"));
+  if (positional.length < 2) return false;
+  return positional.slice(1).every((refspec) => {
+    const spec = refspec.replace(/^\+/, "");
+    const [source, destination = source] = spec.includes(":") ? spec.split(":") : [spec, spec];
+    return source !== "" && UNRESTRICTED_BRANCHES.has(destination.replace(/^refs\/heads\//, ""));
+  });
+}
 
 function directCommandReason(tokens: string[], policy: CommandPolicy): string | null {
   const executable = executableTokens(tokens);
@@ -93,7 +109,10 @@ function directCommandReason(tokens: string[], policy: CommandPolicy): string | 
   }
 
   const git = gitSubcommand(executable);
-  if (git?.name === "push") return "publishes commits to a remote";
+  if (git?.name === "push") {
+    if (policy.allowUnrestrictedBranchPush && pushesOnlyUnrestrictedBranches(git.args)) return null;
+    return "publishes commits to a remote";
+  }
   if (git?.name === "reset" && git.args.includes("--hard")) return "can discard local work";
   if (git?.name === "branch") {
     const deletes = git.args.includes("-D") || git.args.includes("--delete") || hasShortFlag(git.args, "d");
@@ -187,7 +206,10 @@ export function createLifecycleReporter(report: (state: HerdrState) => Promise<v
 
 export default function workflowGuardrails(amp: PluginAPI) {
   const lifecycle = createLifecycleReporter();
-  const commandPolicy = { allowSandboxElevation: orbSandboxEnabled() };
+  const commandPolicy = {
+    allowSandboxElevation: orbSandboxEnabled(),
+    allowUnrestrictedBranchPush: process.env.CREW_MANAGED !== "1",
+  };
 
   amp.on("agent.start", async (event) => {
     await lifecycle.start(event.thread.id, event.id);

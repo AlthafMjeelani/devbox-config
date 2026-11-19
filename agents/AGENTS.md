@@ -35,7 +35,7 @@ Before finishing:
 - Run the `verify-task` skill and base your report on its output.
 - Review your own `git diff` and remove stray edits.
 - Report what changed, what you verified (with command output) and what you did not.
-- Leave the work committed on the feature branch only if asked. Do not push, merge or open a PR unless asked.
+- Leave the work committed on the feature branch only if asked. Do not push, merge or open a PR unless asked (pushing `dev` or `staging` is always fine).
 - For parallel agents, give each its own worktree and branch (`git-wt`, `crew`).
 - This is enforced: commits and (in Claude Code) edits on the default branch, and pushes to `main`, `master`, `develop` or `trunk`, are blocked with a message. If you see "Blocked: you are on 'main'", run `git switch -c feat/<topic>` and continue. Do not bypass it with `ALLOW_DEFAULT_BRANCH` unless the user says to.
 
