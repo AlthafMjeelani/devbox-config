@@ -7,14 +7,15 @@
 // <swiftbar.hideDisablePlugin>true</swiftbar.hideDisablePlugin>
 
 import { renderBar } from "../lib/barimage.ts";
-import { renderTable, tableSize, type Cell } from "../lib/tableimage.ts";
+import { renderCard, cardSize, type CardRow, type Window } from "../lib/tableimage.ts";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
   GRAY, ORANGE, RED, SEV_COLOR, glyphOf, symbolOf, breaches, connected, diffAlerts, forecast, hasQuota, leftOf, pickBest, poolSeverities, poolSeverity,
-  barMeters, statusWord, severity, summarizeAgents, paceBar, elapsedOf, detailText, until, worstRow, type Pool, type Row, type Sev,
+  barMeters, statusWord, severity, summarizeAgents, paceBar, elapsedOf, detailText, until, worstRow, resetsText, resetShort, creditsCard,
+  type Pool, type Row, type Sev, type ResetAccount,
 } from "../lib/aiusage.ts";
 
 const bin = path.join(os.homedir(), ".local/bin");
@@ -114,22 +115,41 @@ const sortedPools = [...quotaPools].sort(
   (a, b) => (SEV_ORDER[poolSeverity(a) ?? "ok"] ?? 2) - (SEV_ORDER[poolSeverity(b) ?? "ok"] ?? 2) || (a.left ?? 101) - (b.left ?? 101),
 );
 
-// The card is one image (green / orange / red bars, colored percentages and status); details stay native below.
-const cellOf = (row: Row | undefined): Cell => {
-  if (!row || row.used === null) return null;
-  const left = Math.max(0, Math.min(100, 100 - row.used));
+// ---- Codex reset credits: network call, so cached for 30 minutes ----
+const creditsFile = path.join(cacheDir, "codex-resets.json");
+let creditAccounts = readJson<{ at: number; accounts: ResetAccount[] }>(creditsFile);
+if (!creditAccounts || Date.now() - creditAccounts.at > 30 * 60_000) {
+  const r = spawnSync(path.join(bin, "codex-resets"), ["--json"], { env, encoding: "utf8", timeout: 30_000 });
+  try {
+    if (r.status !== 0) throw new Error();
+    creditAccounts = { at: Date.now(), accounts: JSON.parse(r.stdout) };
+    writeJson(creditsFile, creditAccounts);
+  } catch {}
+}
+
+// The card is one image: per agent, 5h and 7d side by side with bar, % left and reset time; then the credits panel.
+const windowOf = (row: Row | undefined, label?: string): Window | undefined => {
+  if (!row) return undefined;
+  const left = row.used === null ? null : Math.max(0, Math.min(100, 100 - row.used));
   const sev = severity(left, breaches(row));
-  return { left, color: sev ? SEV_COLOR[sev] : GRAY };
+  return { label: label ?? row.limit, left, color: sev ? SEV_COLOR[sev] : GRAY, detail: resetShort(row.resetAt) };
 };
 const nameOf = (pool: Pool) => poolName(pool).replace(/^Antigravity · /, "AG · ");
-const tableRows = sortedPools.map((pool) => {
+const cardRows: CardRow[] = sortedPools.map((pool) => {
   const five = pool.rows.find((r) => r.limit === "5h");
   const seven = pool.rows.find((r) => r.limit === "7d");
   const single = !five && !seven ? worstRow(pool.rows) ?? undefined : undefined;
   const st = statusWord(pool);
-  return { name: nameOf(pool), nameColor: "#F2F2F7", five: cellOf(five ?? single), seven: cellOf(seven), status: st.text, statusColor: st.sev ? SEV_COLOR[st.sev] : GRAY };
+  const windows = single ? [windowOf(single, single.limit === "-" ? "Quota" : single.limit)!] : [windowOf(five ?? seven), five ? windowOf(seven) : undefined].filter((w): w is Window => !!w);
+  return { name: nameOf(pool), status: st.text, statusColor: st.sev ? SEV_COLOR[st.sev] : GRAY, windows };
 });
-if (tableRows.length) console.log(` | width=${tableSize(tableRows.length).width} height=${tableSize(tableRows.length).height} image=${renderTable({ connected: live.length, attention: attentionCount, rows: tableRows })}`);
+const credits = creditAccounts ? creditsCard(creditAccounts.accounts) : null;
+const openResets = "shell=/bin/zsh param1=-lc param2='codex-resets; read -k1' terminal=true";
+if (cardRows.length || credits) {
+  const size = cardSize(cardRows.length, !!credits);
+  console.log(` | width=${size.width} height=${size.height} image=${renderCard({ connected: live.length, attention: attentionCount, rows: cardRows, credits })}`);
+}
+console.log(`Codex reset credits table | sfimage=arrow.counterclockwise.circle size=13 ${openResets}`);
 console.log("---");
 if (sortedPools.length) console.log("Details | sfimage=chart.bar.doc.horizontal size=13");
 for (const pool of sortedPools) {
@@ -144,7 +164,7 @@ for (const pool of sortedPools) {
     const rowHex = rowSev ? SEV_COLOR[rowSev] : GRAY;
     const name = LIMIT_NAME[row.limit] ?? (row.limit === "-" ? "Quota" : row.limit);
     const note = row.note ? clean(row.note) : "";
-    console.log(`----${name.padEnd(13)} ${l === null ? "no data" : `${Math.round(l)}% left`}${row.resetAt ? `  ·  resets in ${until(row.resetAt)}` : ""}${note ? `  ·  ${note}` : ""} | font=Menlo size=12 color=${rowHex} trim=false`);
+    console.log(`----${name.padEnd(13)} ${l === null ? "no data" : `${Math.round(l)}% left`}${row.resetAt ? `  ·  resets ${resetsText(row.resetAt)}` : ""}${note ? `  ·  ${note}` : ""} | font=Menlo size=12 color=${rowHex} trim=false`);
     console.log(`----${paceBar(row.used, elapsedOf(row))} | font=Menlo size=12 color=${rowHex} trim=false`);
     console.log(`----${detailText(row)} | font=Menlo size=11 color=${GRAY} trim=false`);
     if (f) {
@@ -178,7 +198,6 @@ if (infoPools.length) {
   console.log("---");
 }
 
-console.log("Codex reset credits | sfimage=arrow.counterclockwise.circle shell=/bin/zsh param1=-lc param2=codex-resets terminal=true");
 console.log("Full report | sfimage=terminal shell=/bin/zsh param1=-lc param2='ai-usage; read -k1' terminal=true");
 console.log(`Updated ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} | color=${GRAY} size=11`);
 console.log("Refresh | sfimage=arrow.clockwise refresh=true");

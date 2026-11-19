@@ -334,15 +334,22 @@ function printTable(rows: Row[]) {
 
 async function main() {
   if (process.argv.includes("--help") || process.argv.includes("-h")) {
-    console.log("Usage: codex-resets\n\nShow available reset credits for saved native Codex and OpenCode accounts.");
+    console.log("Usage: codex-resets [--json]\n\nShow available reset credits for saved native Codex and OpenCode accounts.\n--json prints [{account, available, credits: [{grantedAt, expiresAt}], error?}].");
     return;
   }
+  const json = process.argv.includes("--json");
+  const out: { account: string; available: number | null; credits: { grantedAt: string | null; expiresAt: string | null }[]; error?: string }[] = [];
   const rows: Row[] = [];
   for (const savedAccount of loadAccounts()) {
     try {
       const account = await ensureFresh(savedAccount);
       const payload = await fetchResets(account);
       const credits = (payload.credits ?? []).filter((credit) => credit.status === "available");
+      out.push({
+        account: account.name,
+        available: payload.available_count ?? credits.length,
+        credits: credits.map((credit) => ({ grantedAt: credit.granted_at ?? null, expiresAt: credit.expires_at ?? null })),
+      });
       const available = String(payload.available_count ?? credits.length);
       if (!credits.length) {
         rows.push([account.name, available, "-", "-", "-"]);
@@ -358,10 +365,12 @@ async function main() {
         ]);
       });
     } catch (error) {
+      out.push({ account: savedAccount.name, available: null, credits: [], error: (error as Error).message });
       rows.push([savedAccount.name, "error", (error as Error).message, "-", "-"]);
     }
   }
-  printTable(rows);
+  if (json) console.log(JSON.stringify(out));
+  else printTable(rows);
 }
 
 main().catch((error) => {

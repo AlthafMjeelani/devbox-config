@@ -23,6 +23,58 @@ export function until(ms: number | null, now = Date.now()): string {
   return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m % 60}m` : `${m}m`;
 }
 
+/** Local wall-clock time of a reset: "today 14:30", "tomorrow 09:00", "Mon 24 Nov 09:00". */
+export function clockAt(ms: number | null, now = Date.now()): string {
+  if (!ms) return "";
+  const at = new Date(ms);
+  const hm = at.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((day(at) - day(new Date(now))) / 86_400_000);
+  if (days === 0) return `today ${hm}`;
+  if (days === 1) return `tomorrow ${hm}`;
+  const date = at.toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" }).replace(",", "");
+  return `${date} ${hm}`;
+}
+
+/** "in 2h 10m (today 14:30)" - time left until a reset plus its date and time. */
+export const resetsText = (ms: number | null, now = Date.now()): string =>
+  ms ? `in ${until(ms, now)} (${clockAt(ms, now)})` : "";
+
+/** Compact reset line for the card: "2h 4m · today 15:09". */
+export const resetShort = (ms: number | null, now = Date.now()): string =>
+  ms && ms > now ? `${until(ms, now)} · ${clockAt(ms, now)}` : ms ? "resetting now" : "no reset time";
+
+// ---- Codex reset credits (from `codex-resets --json`) ----
+export type ResetCredit = { grantedAt: string | null; expiresAt: string | null };
+export type ResetAccount = { account: string; available: number | null; credits: ResetCredit[]; error?: string };
+
+/** One line for the dropdown: "2 left · next expires in 12d 13h (Tue 02 Dec 02:48)". */
+export function creditsSummary(accounts: ResetAccount[], now = Date.now()): { text: string; available: number } {
+  const ok = accounts.filter((a) => !a.error);
+  const available = ok.reduce((n, a) => n + (a.available ?? a.credits.length), 0);
+  if (!ok.length) return { text: accounts.length ? "unavailable" : "no accounts", available: 0 };
+  const expiries = ok
+    .flatMap((a) => a.credits.map((c) => (c.expiresAt ? Date.parse(c.expiresAt) : NaN)))
+    .filter((t) => Number.isFinite(t) && t > now);
+  const next = expiries.length ? Math.min(...expiries) : null;
+  return { text: `${available} left${next ? ` · next expires ${resetsText(next, now)}` : ""}`, available };
+}
+
+/** Credits panel data: count, "next expires in 12d 13h · Wed 02 Dec 02:48", and one chip per credit ("Wed 02 Dec · 12d"). */
+export function creditsCard(accounts: ResetAccount[], now = Date.now()): { available: number; next: string; chips: string[] } {
+  const { available } = creditsSummary(accounts, now);
+  const expiries = accounts
+    .filter((a) => !a.error)
+    .flatMap((a) => a.credits.map((c) => (c.expiresAt ? Date.parse(c.expiresAt) : NaN)))
+    .filter((t) => Number.isFinite(t) && t > now)
+    .sort((a, b) => a - b);
+  const day = (t: number) => clockAt(t, now).replace(/ \d\d:\d\d$/, "");
+  const chips = expiries.map((t) => `${day(t)} · ${Math.floor((t - now) / 86_400_000)}d`);
+  const errors = accounts.length && accounts.every((a) => a.error);
+  const next = expiries.length ? `next expires in ${until(expiries[0], now)} · ${clockAt(expiries[0], now)}` : errors ? "could not load credits" : "no credits to expire";
+  return { available, next, chips };
+}
+
 // Burn-rate forecast for fixed windows (5h, 7d): assumes usage continues at the pace seen so far.
 export const WINDOW_MS: Record<string, number> = { "5h": 5 * 3_600_000, "7d": 7 * 86_400_000 };
 export type Forecast = { rate: number; unit: string; breachInMs: number | null; endLeft: number; safe: number };
@@ -203,7 +255,7 @@ export function detailText(row: Row, now = Date.now()): string {
   const f = forecast(row, now);
   if (row.used >= 100) parts.push("limit reached");
   else if (f && f.breachInMs !== null) parts.push(`limit in ~${until(now + f.breachInMs, now)}`);
-  else if (row.resetAt) parts.push(`resets in ${until(row.resetAt, now)}`);
+  else if (row.resetAt) parts.push(`resets ${resetsText(row.resetAt, now)}`);
   return parts.join(" · ");
 }
 

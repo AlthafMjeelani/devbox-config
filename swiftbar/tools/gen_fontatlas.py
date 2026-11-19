@@ -1,20 +1,28 @@
 #!/usr/bin/env python3
 """Rasterize Inter (SIL OFL 1.1) into a small glyph atlas used to draw the menu images.
 Usage: python3 swiftbar/tools/gen_fontatlas.py   (needs Pillow and the Inter fonts)
+       INTER_DIR=/path/to/Inter/otf uv run --with pillow swiftbar/tools/gen_fontatlas.py   (e.g. on macOS)
 Writes swiftbar/.config/swiftbar/lib/fontatlas.ts"""
-import base64, json, zlib
+import base64, json, os, zlib
 from PIL import Image, ImageDraw, ImageFont
 
-FONTS = {"reg": "/usr/share/fonts/opentype/inter/Inter-Regular.otf", "semi": "/usr/share/fonts/opentype/inter/Inter-SemiBold.otf"}
-SETS = {"reg26": ("reg", 26), "semi26": ("semi", 26), "reg22": ("reg", 22), "semi22": ("semi", 22)}
+DIR = os.environ.get("INTER_DIR", "/usr/share/fonts/opentype/inter")
+FONTS = {k: os.path.join(DIR, f"Inter-{v}.otf") for k, v in {"reg": "Regular", "semi": "SemiBold", "bold": "Bold"}.items()}
 CHARS = [chr(c) for c in range(32, 127)] + ["·", "↻", "●", "…"]
+DIGITS = list("0123456789")
+# name: (weight, pixel size at 2x, characters)
+SETS = {
+    "reg26": ("reg", 26, CHARS), "semi26": ("semi", 26, CHARS), "reg22": ("reg", 22, CHARS), "semi22": ("semi", 22, CHARS),
+    "semi30": ("semi", 30, CHARS), "semi24": ("semi", 24, CHARS), "reg24": ("reg", 24, CHARS), "reg28": ("reg", 28, CHARS),
+    "bold64": ("bold", 64, DIGITS),
+}
 
 atlas = {}
-for name, (f, size) in SETS.items():
+for name, (f, size, chars) in SETS.items():
     font = ImageFont.truetype(FONTS[f], size)
     asc, desc = font.getmetrics()
     g = {}
-    for ch in CHARS:
+    for ch in chars:
         adv = round(font.getlength(ch))
         bbox = font.getbbox(ch)
         if ch == " " or bbox[2] <= bbox[0]:
