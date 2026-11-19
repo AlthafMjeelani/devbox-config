@@ -75,10 +75,13 @@ Follow the host’s native delegation path in an Amp orb.
    separate Codex setting and must not be appended to the model slug.
    Tasked Codex, Claude, and Kimi workers use their worker-only permission bypass modes.
    OpenCode and Amp use their existing automated execution policies.
-4. **Monitor.** Use `crew watch`, `crew status`, and `crew logs <branch>` to follow workers through completion.
+4. **Make workers visible.** Announce each branch and its session or workspace label after launch.
+   The user can open it from the terminal sidebar or run `crew attach <branch>`.
+   Keep the orchestrator in the original pane and leave finished worker displays available for inspection.
+5. **Monitor.** Use `crew watch`, `crew status`, and `crew logs <branch>` to follow workers through completion.
    Resolve routine questions and changes in scope through the orchestrator.
    Bring the user decisions requiring their authority.
-5. **Review and verify.** Inspect the worker’s diff and run the applicable checks.
+6. **Review and verify.** Inspect the worker’s diff and run the applicable checks.
    Report the result to the user from the orchestrator session.
 
 ## Rules

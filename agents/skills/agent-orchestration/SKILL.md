@@ -17,11 +17,13 @@ Resolve routine dispatch decisions yourself and bring the user decisions that re
 4. **Dispatch** each worker into its own worktree and session:
    - `crew new "<task>" [--claude|--codex|--kimi|--amp|--commandcode] [--profile fast|standard|deep]` (headless, commits on its own branch, never pushes).
    - When the user names Codex or Claude as the worker, use direct delegation below. Otherwise use Crew.
-   - Crew chooses herdr, Rex, or tmux automatically. Load the matching terminal skill when controlling terminal sessions directly.
+   - Open one named worker session in Rex or workspace in Herdr for each task.
+   - Crew chooses the current terminal backend automatically. Announce the worker name and the command the user can use to watch.
+   - Keep the conversation in the original pane and keep worker output available after completion.
 5. **Monitor** with `crew status` / `crew watch`, or `rex-agents watch`. Do not poll in a tight loop; wait for finished or blocked events.
 6. **Review** every branch yourself: read the diff, run the tests. A worker's summary is not proof.
 7. **Integrate when authorized** in dependency order and run the full suite on the integrated result.
-8. **Clean up** finished sessions and remove worktrees when authorized.
+8. **Clean up** when authorized. Keep worker sessions available while the user wants to inspect output.
 
 ## Delegating directly to Codex or Claude
 Stay the orchestrator and launch the named engine headlessly.
@@ -33,16 +35,41 @@ Use the authorized permission bypass on the delegated process, and give the work
    Attach Codex reference images with `-i` when needed.
 2. **Brief**: write `BRIEF.md` in `run_dir` using the template below.
    Assign the worker role explicitly and name the output files the worker must create.
-3. **Run** headless, in the background, with stdin closed (without `</dev/null` Codex waits for stdin and hangs):
+3. **Launch** from a separate terminal session using a short launcher file in `run_dir`.
+   Pass the engine, worker directory, and run directory as arguments to the launcher.
+   The launcher reads the brief locally, displays output in the worker terminal, saves a log, and records the exit status.
+
    ```bash
-   codex exec --dangerously-bypass-approvals-and-sandbox -C "$worker_dir" -o "$run_dir/result.md" "$(cat "$run_dir/BRIEF.md")" </dev/null > "$run_dir/worker.log" 2>&1 &
-   # Claude uses the worktree as its working directory.
-   (cd "$worker_dir" && claude -p --dangerously-skip-permissions "$(cat "$run_dir/BRIEF.md")") </dev/null > "$run_dir/result.md" 2> "$run_dir/worker.log" &
+   #!/usr/bin/env bash
+   set -o pipefail
+   engine=$1
+   worker_dir=$2
+   run_dir=$3
+   cd "$worker_dir" || exit 1
+   brief=$(cat "$run_dir/BRIEF.md") || exit 1
+   case "$engine" in
+     codex) command=(codex exec --dangerously-bypass-approvals-and-sandbox -o "$run_dir/result.md" "$brief") ;;
+     claude) command=(claude -p --dangerously-skip-permissions --verbose --output-format stream-json "$brief") ;;
+     *) exit 2 ;;
+   esac
+   "${command[@]}" </dev/null 2>&1 | tee "$run_dir/worker.log"
+   status=$?
+   printf '%s\n' "$status" > "$run_dir/exit-status"
+   exit "$status"
    ```
-   Add `-m <model>` only when `agent-route` says so.
+
+   Use the matching terminal skill and a unique, descriptive `worker_label`.
+
+   - **Rex**: Run `rex new --cwd "$worker_dir" --keep-open --json "$worker_label" -- bash "$run_dir/worker.sh" "$engine" "$worker_dir" "$run_dir"`. Record the returned session ID.
+   - **Herdr**: Run `herdr workspace create --cwd "$worker_dir" --label "$worker_label" --no-focus`. Extract `.result.root_pane.pane_id` and pass a short quoted launcher command using `herdr pane run "$pane_id" "$(printf '%q ' bash "$run_dir/worker.sh" "$engine" "$worker_dir" "$run_dir")"`.
+   - In other terminals, use the available session backend or run the launcher in a separate terminal.
+
+   Report the session or workspace label as soon as the launch succeeds.
+   Add the model flag only when `agent-route` calls for it.
    For a Codex scratch task outside Git, add `--skip-git-repo-check`.
-4. **Monitor**: wait for the background completion; for progress, read the worker log or the engine run transcript.
-   If nothing changes for about 10 minutes, check the process and stop it rather than waiting indefinitely.
+4. **Monitor** the session and `worker.log` until `exit-status` appears.
+   Read Codex's final message from `result.md` or Claude's result event from the stream log.
+   If progress stalls, inspect the terminal and resolve or surface the blocker.
 5. **Review**: open the produced files (look at images, read the diff, run the tests).
 6. **Integrate**: apply or adapt the result in the main work, verify it end to end, then report what the worker produced and what you changed.
 7. **Clean up**: remove worktrees you created once their branch is merged or abandoned.

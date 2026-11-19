@@ -119,6 +119,9 @@ Postman CLI is installed on this device, and can be used for API Engineering wor
   When the user explicitly names Codex or Claude as the worker, dispatch that engine directly using its headless invocation in `agent-orchestration`.
   Otherwise use `crew` for dispatch and monitoring.
 - Use `herdr` for Herdr terminal control and `rex-terminal` for Rex terminal control.
+  Open one named worker session in Rex or one named worker workspace in Herdr for every dispatch, including direct Codex or Claude handoffs.
+  Keep the orchestrator in the original pane and tell the user where to watch live output.
+  Keep finished worker displays available for inspection until the user is ready to close them.
   Crew selects the matching terminal backend automatically.
 - The user has authorized worker-only permission bypass for delegated Codex and Claude jobs.
   Use the same worker permission mode for direct dispatch and tasked crew jobs.
