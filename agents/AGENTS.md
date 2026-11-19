@@ -53,6 +53,7 @@ Before finishing:
 ## Safety
 - Confirm before hard-to-reverse or outward-facing actions (push, deploy, delete, send).
 - Never auto-push, auto-merge, or enable yolo / skip-permission modes on your own.
+  Exception: when the user says to give, ask or hand a task to Codex, run Codex with `--yolo` (see Multi-agent work).
 - Before deleting or overwriting, look at the target; if it contradicts expectations, stop and surface it.
 
 ## Commits
@@ -109,7 +110,13 @@ Postman CLI is installed on this device, and can be used for API Engineering wor
 <!-- postman-cli:installation:end -->
 
 ## Multi-agent work
-- For parallel or multi-step agent work, follow `agent-orchestration`; for handoffs and messages between agents, follow `agent-communication`.
+- Any work that involves more than one agent (delegating to Codex or another engine, crew, subagents, parallel workers) automatically switches this session to the orchestrator flow in `agent-orchestration`: brief, dispatch, monitor, review, verify, report.
+  Do not wait to be told to orchestrate.
+- When in doubt about scope, which agent to use, or whether a step is safe, ask the user before dispatching; do not guess.
+- For handoffs and messages between agents, follow `agent-communication`.
 - Inside a Rex terminal (`REX_SESSION` is set), use `rex-terminal` and `rex-agents` to run, message and monitor other agents.
+- When the user says to give, ask or hand work to Codex: this session is the orchestrator and Codex is the worker.
+  Run `codex exec --yolo` headless (stdin from `/dev/null`, in the background, `-o` for its final message), following "Delegating to Codex" in `agent-orchestration`.
+  Write the brief, monitor, then review and verify Codex's output yourself before reporting; never just relay its summary.
 - Pick the model and effort per task with `agent-route "<task>" --files N` (see `model-routing`). Default low; escalate only when it says so.
 - UI and design work: follow `design-workflow` (brief, direction, tokens, build, accessibility, visual QA, critique, handoff). Use Figma through `figma-workflow` when a link exists, reuse the repo's components and tokens, and look at screenshots before saying a UI is done.
