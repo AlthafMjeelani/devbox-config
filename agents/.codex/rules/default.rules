@@ -105,3 +105,6 @@ prefix_rule(
     decision = "allow",
     justification = "Read-only process listing",
 )
+prefix_rule(pattern=["node", "/private/tmp/vf-reference-browser.cjs"], decision="allow")
+prefix_rule(pattern=["make", "agents-sync"], decision="allow")
+prefix_rule(pattern=["make", "verify-agent-workflow"], decision="allow")
