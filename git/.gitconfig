@@ -6,10 +6,10 @@
 	hooksPath = ~/.config/git/hooks
 	excludesfile = ~/.gitignore_global
 	editor = nvim
-	pager = delta
+	pager = command -v delta >/dev/null && delta || less
 
 [interactive]
-	diffFilter = delta --color-only
+	diffFilter = command -v delta >/dev/null && delta --color-only || cat
 
 [delta]
 	navigate = true
