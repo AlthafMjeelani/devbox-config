@@ -97,7 +97,7 @@ Edit `agents/AGENTS.md`, commit, and every agent picks it up on its next session
 | `agents/` | Shared agent brain: `AGENTS.md`, subagents, models, and the shared skills |
 | `opencode/`, `amp/`, `antigravity/`, `commandcode/`, `herdr/` | Per-agent settings, plugins and commands |
 | `nvim/` | Neovim (LazyVim) with AI plugins and LSPs |
-| `tmux/`, `tmux-resurrect/` | tmux, session restore and agent status bar |
+| `tmux/` | tmux, session restore (vendored tmux-resurrect) and agent status bar |
 | `zsh/`, `zshenv/`, `zprofile/`, `starship/` | Shell, aliases, PATH exports, prompt, sessionizers |
 | `alacritty/`, `ghostty/`, `kitty/`, `wezterm/` | Terminal emulators |
 | `git/`, `lazygit/`, `.vscode/` | Git config, Lazygit (`Ctrl+a` runs an AI commit), VS Code settings |

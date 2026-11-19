@@ -49,7 +49,12 @@ run()  { if [ "$DRY" = 1 ]; then printf '  %s[dry-run]%s %s\n' "$D" "$N" "$*"; e
 have() { command -v "$1" >/dev/null 2>&1; }
 
 OS="$(uname -s)"
-case "$OS" in Darwin) PLATFORM=mac ;; Linux) PLATFORM=linux ;; *) die "Unsupported OS: $OS" ;; esac
+case "$OS" in
+  Darwin) PLATFORM=mac ;;
+  Linux) PLATFORM=linux ;;   # includes WSL2, the supported way to use this repo on Windows
+  MINGW*|MSYS*|CYGWIN*) die "Native Windows is not supported: install WSL2 (wsl --install -d Ubuntu) and run ./setup.sh inside it." ;;
+  *) die "Unsupported OS: $OS" ;;
+esac
 
 DEFAULT_PKGS="$(sed -n 's/^DEFAULT_PACKAGES := //p' Makefile)"
 [ -n "$DEFAULT_PKGS" ] || die "Could not read DEFAULT_PACKAGES from the Makefile."

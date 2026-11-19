@@ -22,7 +22,6 @@ permission:
   edit: ask
   skill:
     "*": deny
-    "debugging": allow
     "systematic-debugging": allow
     "test-writer": allow
     "test-driven-development": allow

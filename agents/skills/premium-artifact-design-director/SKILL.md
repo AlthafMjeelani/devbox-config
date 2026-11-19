@@ -10,12 +10,12 @@ Do not claim to match the Texol reference PDF unless the actual PDF is available
 
 Load only the skills relevant to the requested output:
 
-- Web and dashboards: `frontend-design` or `anthropic-frontend-design`, with `ui-ux-pro-max` or `impeccable` when design direction or polish is needed.
+- Web and dashboards: `frontend-design`, with `ui-ux-pro-max` or `impeccable` when design direction or polish is needed.
 - Mobile: `ui-ux-pro-max` and the implementation skill for the existing stack; use `design-mobile-apps` only when a Sleek workflow is requested and access is configured.
 - Editable PowerPoint: `pptx` and `business-presentation`.
 - HTML presentations: `frontend-slides` or `slides`, preserving the requested output format.
 - Reports and documents: `pdf`, `docx` or `xlsx`, with `content-storytelling` for substantial narratives.
-- Graphics and diagrams: `canvas-design`, `mermaid-diagrams` or `infographic-diagram` as the content requires.
+- Graphics and diagrams: `poster-and-social-media-design`, `mermaid-diagrams` or `infographic-diagram` as the content requires.
 - UI verification: `web-design-guidelines` and `webapp-testing` or an available browser skill.
 
 Follow the host's required tools when a bundled format skill is available.

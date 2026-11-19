@@ -2,7 +2,7 @@
 description: Seed a per-project AGENTS.md (+ CLAUDE.md symlink) in the current repo.
 agent: build
 ---
-Use the init-agents-md skill.
+Use the project-agents-md skill.
 
 Create a project-level `AGENTS.md` if it does not already exist. Do not commit.
 

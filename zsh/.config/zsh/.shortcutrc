@@ -23,7 +23,7 @@ fpath=("$HOME/.config/zsh/completions" "$HOME/.asdf/completions" $fpath)
 autoload -Uz compinit && compinit
 
 t_s(){
-    ~/devbox-config/zsh/.config/zsh/tmux-sessionizer.sh
+    ~/.local/bin/tmux-sessionizer
 }
 
 zle -N fzf-file-widget

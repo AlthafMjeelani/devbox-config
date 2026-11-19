@@ -28,7 +28,6 @@ permission:
     "*": deny
     "test-writer": allow
     "test-driven-development": allow
-    "debugging": allow
     "systematic-debugging": allow
     "code-review": allow
     "grounding": allow

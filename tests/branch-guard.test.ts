@@ -114,15 +114,34 @@ describe("git hooks", () => {
     const main = withHooks("main");
     expect(sh("git commit -q --allow-empty -m x", main.dir, main.env).code).not.toBe(0);
     const feat = withHooks("feat/y");
-    expect(sh("git commit -q --allow-empty -m x", feat.dir, feat.env).code).toBe(0);
+    expect(sh('git commit -q --allow-empty -m "chore: x"', feat.dir, feat.env).code).toBe(0);
   });
   test("a repo's own hook still runs through the global runner", () => {
     const { dir, env } = withHooks("feat/z");
     const local = resolve(dir, ".git/hooks/commit-msg");
     writeFileSync(local, '#!/bin/sh\necho ran > "$(git rev-parse --show-toplevel)/chained.txt"\n');
     chmodSync(local, 0o755);
-    expect(sh("git commit -q --allow-empty -m x", dir, env).code).toBe(0);
+    expect(sh('git commit -q --allow-empty -m "chore: x"', dir, env).code).toBe(0);
     expect(readFileSync(resolve(dir, "chained.txt"), "utf8").trim()).toBe("ran");
+  });
+  test("commit-msg requires a Conventional Commits subject", () => {
+    const { dir, env } = withHooks("feat/msg");
+    for (const ok of ["feat: add x", "fix(auth): reject expired sessions", "chore!: drop node 18", "Revert \"feat: add x\"", "fixup! feat: add x"]) {
+      expect([ok, sh(`git commit -q --allow-empty -m '${ok}'`, dir, env).code]).toEqual([ok, 0]);
+    }
+    const bad = sh("git commit -q --allow-empty -m 'updated stuff'", dir, env);
+    expect(bad.code).not.toBe(0);
+    expect(bad.err).toContain("Conventional Commit");
+    sh("git config devbox.allowAnyCommitMessage true", dir);
+    expect(sh("git commit -q --allow-empty -m 'updated stuff'", dir, env).code).toBe(0);
+  });
+  test.skipIf(!Bun.which("gitleaks"))("pre-commit blocks staged secrets when gitleaks is installed", () => {
+    const { dir, env } = withHooks("feat/leak");
+    writeFileSync(resolve(dir, "config.ts"), 'export const key = "AKIA' + 'Z7QK3LMN4PQR8STU";\nexport const secret = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY9x";\n');
+    sh("git add config.ts", dir);
+    const r = sh('git commit -q -m "feat: add config"', dir, { ...env, PATH: `${env.PATH}:${Bun.which("gitleaks")!.replace(/\/gitleaks$/, "")}` });
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain("gitleaks");
   });
 });
 

@@ -93,7 +93,6 @@ alias ai-start="sudo systemctl start ollama.service"
 alias ai-stop="sudo systemctl stop ollama.service"
 alias ai-status="systemctl status ollama.service"
 
-alias ide="source ~/devbox-config/zsh/.config/zsh/ide_session.sh"
 
 
 # vim related (use nvim for neovim and vim for lazyvim)

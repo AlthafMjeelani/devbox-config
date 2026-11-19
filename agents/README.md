@@ -44,7 +44,7 @@ agents/skills/                          <- canonical SKILL.md set (real files, t
   Amp discovers ~/.claude/skills
 ```
 
-New command-backed skills: `autoplan`, `investigate`, `research`, `critique`, `explain`, and `init-agents-md`.
+New command-backed skills: `autoplan`, `research`, `critique` and `explain`.
 These replace tool-specific command trees for Claude/Codex.
 OpenCode keeps thin slash-command wrappers where model routing is useful.
 

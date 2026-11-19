@@ -5,7 +5,7 @@
 onboarding = false
 
 # Agent state changes in background workspaces -> desktop notifications
-# (D-Bus, lands in swaync). Sounds stay at their defaults.
+# (macOS Notification Center; D-Bus/swaync on Linux). Sounds stay at their defaults.
 [ui.toast]
 delivery = "system"
 
@@ -29,7 +29,7 @@ next_workspace = "ctrl+alt+period"
 [[keys.command]]
 key = "prefix+f"
 type = "popup"
-command = "~/.config/zsh/herdr-sessionizer.sh"
+command = "~/.local/bin/herdr-sessionizer"
 description = "fuzzy jump: projects, workspaces, agents"
 width = "85%"
 height = "75%"
@@ -42,7 +42,7 @@ agent_panel_sort = "priority"
 [[keys.command]]
 key = "prefix+shift+f"
 type = "popup"
-command = "~/.config/zsh/herdr-file-search.sh"
+command = "~/.local/bin/herdr-file-search"
 description = "file search: home files, folders, and contents"
 width = "90%"
 height = "85%"

@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Rex sessionizer: fuzzy-pick a project folder, open (or switch to) a Rex session for it.
+# Run it from any Rex pane: rex-sessionizer
+set -u
+bases=()
+[[ -d /Volumes/PortableSSD/dev ]] && bases+=(/Volumes/PortableSSD/dev)
+[[ -d "$HOME/dev" ]] && bases+=("$HOME/dev")
+((${#bases[@]})) || bases=("$HOME")
+
+dir="$(for b in "${bases[@]}"; do
+  find "$b" -maxdepth 5 \( -name .git -o -name node_modules -o -name .dart_tool -o -name build -o -name dist -o -name .next -o -name .turbo \) -prune -o -type d -print 2>/dev/null
+done | sort -u | fzf --prompt='project> ' --reverse --exit-0)" || exit 0
+[[ -n "$dir" ]] || exit 0
+
+name="$(basename "$dir" | tr -c 'A-Za-z0-9_\n-' '_')"
+id="$(rex ls --json 2>/dev/null | python3 -c '
+import json,sys
+n=sys.argv[1]
+try: d=json.load(sys.stdin)
+except Exception: d=[]
+d=d.get("sessions",d) if isinstance(d,dict) else d
+for s in d:
+    if s.get("label")==n: print(s.get("session_id","")); break' "$name")"
+if [[ -z "$id" ]]; then
+  id="$(rex new "$name" -c "$dir" --json | python3 -c 'import json,sys; d=json.load(sys.stdin); d=d.get("session",d); print(d.get("session_id") or d.get("id",""))')"
+fi
+# Target the client explicitly to avoid ambiguity when multiple app clients are connected
+client_arg=()
+if [[ -n "${REX_CLIENT:-}" ]]; then
+  client_arg=(-C "$REX_CLIENT")
+elif [[ -n "${REX_BLOCK:-}" ]]; then
+  cid="$(rex block inspect "$REX_BLOCK" --json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("block",{}).get("owner",""))')"
+  [[ -n "$cid" ]] && client_arg=(-C "$cid")
+fi
+
+if ((${#client_arg[@]} == 0)); then
+  cid="$(rex client ls --json 2>/dev/null | python3 -c '
+import json,sys
+try:
+    clients = [c for c in json.load(sys.stdin).get("clients", []) if c.get("info",{}).get("kind") == "app"]
+    if clients: print(clients[0].get("client_id", ""))
+except Exception: pass
+')"
+  [[ -n "$cid" ]] && client_arg=(-C "$cid")
+fi
+
+rex "${client_arg[@]}" do session.select session_id="$id"

@@ -2,7 +2,7 @@
 description: Debug failing tests with root-cause-first investigation.
 agent: debugger
 ---
-Use the debugging skill.
+Use the systematic-debugging skill.
 
 Context:
 !`git status --short`

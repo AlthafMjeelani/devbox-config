@@ -23,18 +23,17 @@
 [merge]
 	tool = nvimdiff
 	conflictstyle = zdiff3
+	# Rebase, then fast-forward: never create merge commits by accident (pass --no-ff to override).
+	ff = only
 
 [diff]
 	tool = nvimdiff
 	algorithm = histogram
 	colorMoved = default
 
-[difftool "nvimdiff"]
-	cmd = nvim -d \"$LOCAL\" \"$REMOTE\"
-
-[mergetool "nvimdiff"]
-	cmd = nvim -d \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
-	trustExitCode = true
+# nvimdiff is built into git (git help mergetool); no custom cmd needed.
+[mergetool]
+	keepBackup = false
 
 [rerere]
 	enabled = true
@@ -44,6 +43,14 @@
 
 [pull]
 	rebase = true
+
+[rebase]
+	autoStash = true
+	autoSquash = true
+	updateRefs = true
+
+[fetch]
+	prune = true
 
 [init]
 	defaultBranch = main

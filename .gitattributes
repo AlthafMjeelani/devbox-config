@@ -1,0 +1,20 @@
+# Keep LF everywhere so shell scripts, hooks and configs run unchanged on macOS, Linux, WSL and Git for Windows.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.zip binary
+*.docx binary
+*.pptx binary
+*.xlsx binary
+# Windows-native scripts keep CRLF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf

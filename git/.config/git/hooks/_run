@@ -1,13 +1,41 @@
 #!/usr/bin/env bash
 # Global git hook runner. Every hook name below is a symlink to this file.
-# 1) pre-commit refuses commits on main/master/develop (see guard-default-branch).
-# 2) Then it runs the repo's own hook from .git/hooks, because a global core.hooksPath would otherwise hide it.
+# 1) pre-commit refuses commits on main/master/develop (see guard-default-branch),
+#    then scans the staged diff for secrets with gitleaks when it is installed.
+# 2) commit-msg requires a Conventional Commits subject (feat:, fix(scope):, chore!: ...).
+#    Merge, revert, fixup! and squash! messages pass. Per repo opt-out: git config devbox.allowAnyCommitMessage true
+# 3) Then it runs the repo's own hook from .git/hooks, because a global core.hooksPath would otherwise hide it.
+# Skip all of it once with: git commit --no-verify
 hook="$(basename "$0")"
+
 if [ "$hook" = pre-commit ]; then
   guard="$(command -v guard-default-branch 2>/dev/null || true)"
   [ -n "$guard" ] || guard="$HOME/.local/bin/guard-default-branch"
   if [ -x "$guard" ]; then "$guard" check . || exit 1; fi
+  if command -v gitleaks >/dev/null 2>&1; then
+    if ! gitleaks git --pre-commit --staged --redact --no-banner --log-level warn .; then
+      echo "Blocked: gitleaks found a possible secret in the staged changes. Remove it, or mark a false positive with a 'gitleaks:allow' comment." >&2
+      exit 1
+    fi
+  fi
 fi
+
+if [ "$hook" = commit-msg ] && [ -n "${1:-}" ] && [ -f "$1" ]; then
+  if [ "$(git config --get devbox.allowAnyCommitMessage 2>/dev/null || true)" != true ]; then
+    subject="$(grep -v '^#' "$1" | sed -n '/[^[:space:]]/{p;q;}')"
+    types='feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert'
+    if [ -n "$subject" ] && ! printf '%s' "$subject" | grep -Eq "^(($types)(\([a-z0-9._/-]+\))?!?: .+|Merge .+|Revert .+|fixup! .+|squash! .+|amend! .+)$"; then
+      cat >&2 <<MSG
+Blocked: commit subject is not a Conventional Commit:
+  $subject
+Use <type>(optional-scope): <description>, for example "fix(auth): reject expired sessions".
+Types: ${types//|/, }.  Per repo opt-out: git config devbox.allowAnyCommitMessage true
+MSG
+      exit 1
+    fi
+  fi
+fi
+
 common="$(git rev-parse --git-common-dir 2>/dev/null || true)"
 local_hook="$common/hooks/$hook"
 if [ -n "$common" ] && [ -x "$local_hook" ] && [ "$local_hook" != "$0" ]; then exec "$local_hook" "$@"; fi

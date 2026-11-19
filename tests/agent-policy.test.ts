@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const repo = resolve(import.meta.dir, "..");
@@ -48,6 +48,13 @@ describe("agent policy files", () => {
     expect(bash["git push origin dev"]).toBe("allow");
     expect(keys.indexOf("git push*")).toBeLessThan(keys.indexOf("git push* main"));
     expect(keys.indexOf("git push*")).toBeLessThan(keys.indexOf("git push origin staging"));
+  });
+
+  test("generated Claude agents start with frontmatter so Claude Code loads them", () => {
+    const dir = resolve(repo, "agents/.claude/agents");
+    const files = readdirSync(dir).filter((file) => file.endsWith(".md"));
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) expect([file, read(`agents/.claude/agents/${file}`).startsWith("---\nname: ")]).toEqual([file, true]);
   });
 
   test("personal-context templates exist for the files AGENTS.md reads", () => {

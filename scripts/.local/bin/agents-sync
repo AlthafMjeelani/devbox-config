@@ -154,7 +154,8 @@ for (const role of Object.keys(models).sort()) {
   if (!readOnly && !EDIT_CAPABLE.has(role)) throw new Error(`Role is neither edit-deny nor edit-capable: ${role}`);
 
   const claudeBody = readOnly ? `${body}\nRead-only role: do not edit files.\n` : body;
-  const claude = `${generated}\n---\nname: ${role}\ndescription: ${yamlQuote(description)}\nmodel: ${models[role].claude}\ntools: ${readOnly ? CLAUDE_READ_ONLY_TOOLS : CLAUDE_EDIT_TOOLS}\n---\n${claudeBody}`;
+  // Claude Code only loads an agent when its frontmatter starts on line 1, so the marker goes after it.
+  const claude = `---\nname: ${role}\ndescription: ${yamlQuote(description)}\nmodel: ${models[role].claude}\ntools: ${readOnly ? CLAUDE_READ_ONLY_TOOLS : CLAUDE_EDIT_TOOLS}\n---\n<!-- ${generated.slice(2)} -->\n${claudeBody}`;
   ok = writeOrCheck(path.join(claudeDir, `${role}.md`), claude) && ok;
 
   const codexConfig = models[role].codex;

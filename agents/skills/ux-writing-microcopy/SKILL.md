@@ -22,4 +22,4 @@ description: Write clear interface text: buttons, labels, errors, empty states, 
 - Read every string out of context. Cut words until meaning breaks, then add one back.
 - Keep strings externalized for i18n; avoid concatenated sentences.
 
-Related: `design-critique`, `internal-comms`, `web-accessibility-audit`.
+Related: `design-critique`, `web-accessibility-audit`.

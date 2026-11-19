@@ -466,7 +466,7 @@ Each routes to a subagent (which fixes the model) and usually uses the linked sk
 |---|---|---|---|
 | `/research` | researcher (gpt-6.1-sol-low) | research | Research a topic using live web sources |
 | `/explain` | debugger (gpt-6.1-sol) | explain | Explain code, behavior, or repo structure |
-| `/investigate` | debugger (gpt-6.1-sol) | investigate | Investigate a bug/failure before proposing fixes |
+| `/investigate` | debugger (gpt-6.1-sol) | systematic-debugging | Investigate a bug/failure before proposing fixes |
 | `/autoplan` | architect (gpt-6.1-sol) | autoplan | End-to-end implementation plan, no edits |
 | `/plan-feature` | architect (gpt-6.1-sol) | autoplan | Plan a feature implementation, no changes |
 | `/effort-estimate` | architect (gpt-6.1-sol) | effort-estimate | Structured effort, timeline, and cost estimate |
@@ -493,7 +493,7 @@ Each routes to a subagent (which fixes the model) and usually uses the linked sk
 | `/second-pass` | reviewer (gpt-6.1-terra) | second-pass | Re-review after fixes; confirm resolved, no regressions |
 | `/test-plan` | tester (gpt-6.1-terra) | test-writer | Practical test plan for a change/feature |
 | `/qa-only` | tester (gpt-6.1-terra) | - | Test changed behavior, report bugs, no code changes |
-| `/debug-tests` | debugger (gpt-6.1-sol) | debugging | Debug failing tests, root-cause first |
+| `/debug-tests` | debugger (gpt-6.1-sol) | systematic-debugging | Debug failing tests, root-cause first |
 | `/crew` | build (gpt-6.1-terra-low) | crew | Dispatch a crewmate per feature, monitor, report ready branches |
 | `/gate-review` | reviewer (gpt-6.1-terra) | gate-review | Structured JSON review for the gate (auto_fix vs ask_user) |
 | `/ship-gate` | build → `gate` | ship-gate | Validate in a disposable worktree, then push + PR |
@@ -503,7 +503,7 @@ Each routes to a subagent (which fixes the model) and usually uses the linked sk
 | `/changelog` | pr-writer (gpt-6-luna-low) | release-notes | Draft changelog/release notes from commits+diffs |
 | `/pr-body` | pr-writer (gpt-6-luna-low) | pull-request | Draft a PR title + body from branch changes |
 | `/docs-update` | docs-writer (gpt-6-luna-low) | documentation | Update docs/README from current changes |
-| `/init-agents-md` | build (gpt-6.1-terra-low) | init-agents-md | Seed a per-project `AGENTS.md` (+ `CLAUDE.md` symlink) |
+| `/init-agents-md` | build (gpt-6.1-terra-low) | project-agents-md | Seed a per-project `AGENTS.md` (+ `CLAUDE.md` symlink) |
 | `/init-gate` | build (gpt-6.1-terra-low) | - | Seed optional `.gate.sh` ship-gate overrides |
 
 ### Skills (36) - shared across Claude, Codex, OpenCode, Kimi Code, Amp, and CommandCode
@@ -522,7 +522,6 @@ Each routes to a subagent (which fixes the model) and usually uses the linked sk
 | `effort-estimate` | Structured effort, timeline, cost, budget, and phase estimates | `/effort-estimate`, `/proposal-commercial-review` |
 | `proposal-writing` | Client proposal drafting/review: scope, commercials, AMC, payment terms, assumptions, exclusions | `/proposal-draft`, `/proposal-review`, `/proposal-commercial-review` |
 | `prototyping-proposals` | Proposal-aligned prototype plans, HTML prototypes, image briefs, and image-generation prompts | `/proposal-prototype` |
-| `debugging` | Lightweight diagnosis (escalates to systematic) | `/debug-tests` |
 | `systematic-debugging` | Root-cause investigation | `/investigate` |
 | `test-writer` | Create/update/review tests | `/test-plan` |
 | `test-driven-development` | Failing-test-first for behavior changes | (build/tester) |
@@ -541,11 +540,9 @@ Each routes to a subagent (which fixes the model) and usually uses the linked sk
 | `handoff` | Redacted cross-agent or cross-session continuation artifact | (any agent) |
 | `adversarial-verification` | Pass-fail-pass proof for guardrails, validators, permissions, and invariants | (build/tester/reviewer) |
 | `autoplan` | End-to-end implementation, feature, and agentic workflow plans | `/autoplan`, `/plan-feature`, `/agentic-plan` |
-| `investigate` | Read-only bug/failure investigation before fixes | `/investigate` |
 | `research` | External/web research with citations | `/research` |
 | `critique` | Adversarial second opinion | `/critique`, `/second-opinion` |
 | `explain` | Explain code/behavior with file references | `/explain` |
-| `init-agents-md` | Bootstrap per-repo `AGENTS.md` and `CLAUDE.md` symlink | `/init-agents-md` |
 
 Available everywhere: in **Claude** as `/skill-name` or auto-activated; in **OpenCode** invoked by
 agents (governed by each agent's `skill:` allowlist in its `.md`); in **Codex** as `$skill-name`;

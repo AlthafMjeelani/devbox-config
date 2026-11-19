@@ -2,8 +2,7 @@
 description: Investigate a bug or failure systematically before proposing fixes.
 agent: debugger
 ---
-Use systematic-debugging, debugging, grounding, code-review, and test-writer skills when relevant.
-Use the investigate skill.
+Use the systematic-debugging skill, plus grounding, code-review and test-writer when relevant.
 
 Issue:
 $ARGUMENTS
