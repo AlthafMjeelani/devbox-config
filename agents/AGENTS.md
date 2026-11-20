@@ -12,7 +12,8 @@ Project-specific rules live in each repo's own `AGENTS.md`.
   Prefer quality, simplicity, robustness, scalability, and long-term maintainability.
 - Long-running local commands (flutter build apk/appbundle, gradle builds, full test runs) are normal work:
   run them with an extended timeout instead of skipping or asking.
-  Never skip a build just because it takes time; only skip when the environment lacks the tool, and say so.
+  Never skip a build just because it takes time; only skip when the environment lacks the tool, and say
+   so.
 
 ## Coding workflow
 Before changing any code:
