@@ -110,25 +110,10 @@ describe("Amp workflow guardrails", () => {
     expect(blockedCommandReason(command)).toBeNull();
   });
 
-  test("interactive sessions push dev and staging without a confirm; everything else still asks", () => {
-    const interactive = { allowUnrestrictedBranchPush: true };
-    for (const command of ["git push origin dev", "git push -u origin staging", "git push origin HEAD:dev", "git -C /tmp/r push origin +feat/x:staging"]) {
-      expect([command, blockedCommandReason(command, interactive)]).toEqual([command, null]);
-    }
-    for (const command of [
-      "git push origin main",
-      "git push",
-      "git push origin dev main",
-      "git push origin --delete dev",
-      "git push -d origin staging",
-      "git push origin :dev",
-      "git push --all origin",
-      "git push origin feat/x",
-    ]) {
-      expect([command, blockedCommandReason(command, interactive)]).not.toEqual([command, null]);
-    }
-    expect(blockedCommandReason("git push origin dev")).not.toBeNull();
-  });
+  test.each(["git push origin dev", "git push -u origin staging", "git push origin feat/x"])(
+    "flags outward-facing command %s",
+    (command) => expect(blockedCommandReason(command)).not.toBeNull(),
+  );
 
   test("allows sandbox-local elevation in Amp orbs without weakening shared-state guards", () => {
     const orbPolicy = { allowSandboxElevation: true };
@@ -251,7 +236,7 @@ describe("Crew Amp execution", () => {
     expect(command).toContain("--output-format stream-json --verbose");
     expect(command).toContain("jq --unbuffered");
     expect(command).toContain("set -o pipefail");
-    expect(command).toContain("--dangerously-skip-permissions");
+    expect(command).not.toContain("--dangerously-skip-permissions");
   });
 
   test("selects native Rex from a Rex pane and honors explicit backend overrides", () => {
@@ -260,9 +245,9 @@ describe("Crew Amp execution", () => {
     expect(callCrewFunction("unset CREW_BACKEND; HERDR_ENV=1 REX_SESSION=session:test detect_backend")).toBe("herdr");
   });
 
-  test("uses the authorized permission flags for headless Codex and Kimi", () => {
-    expect(callCrewFunction("codex_headless_command test standard task")).toContain("--dangerously-bypass-approvals-and-sandbox");
-    expect(callCrewFunction("engine=kimi; model=test; task=task; worker_command")).toContain("kimi --yolo");
+  test("keeps headless Codex sandboxed and Kimi on standard permissions", () => {
+    expect(callCrewFunction("codex_headless_command test standard task")).toContain("--sandbox workspace-write");
+    expect(callCrewFunction("engine=kimi; model=test; task=task; worker_command")).not.toContain("--yolo");
     expect(callCrewFunction("codex_interactive_command test standard")).not.toContain("--dangerously-bypass-approvals-and-sandbox");
   });
 
@@ -272,20 +257,21 @@ describe("Crew Amp execution", () => {
     expect(command).toContain("--plugin-ready-timeout 10 -x");
   });
 
-  test("propagates bounded auto-approval to every OpenCode subagent", () => {
+  test("propagates scoped permissions to OpenCode subagents", () => {
     const settingsPath = resolve(repo, "scripts/.local/share/agentic/opencode-crew-settings.json");
     const command = callCrewFunction(`OPENCODE_CREW_SETTINGS='${settingsPath}'; opencode_headless_command openai/gpt-6.1-terra 'finish task'`);
     expect(command).toContain("CREW_MANAGED=1 OPENCODE_CONFIG_CONTENT=");
     expect(command).toContain("opencode run --model openai/gpt-6.1-terra");
-    expect(command).toContain("--agent build --auto");
+    expect(command).toContain("--agent build");
+    expect(command).not.toContain("--auto");
 
     const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
     expect(settings.permission).toMatchObject({
       edit: "allow",
-      external_directory: "allow",
-      webfetch: "allow",
+      external_directory: "deny",
+      webfetch: "ask",
       bash: {
-        "*": "allow",
+        "*": "ask",
         "git push*": "deny",
         "git reset --hard*": "deny",
         "git clean -f*": "deny",
@@ -319,7 +305,7 @@ describe("Crew Amp execution", () => {
     expect(callCrewFunction("resolve_profile fast codex")).toBe("gpt-6-luna");
     const headless = callCrewFunction("codex_headless_command gpt-6-luna fast 'finish task'");
     const interactive = callCrewFunction("codex_interactive_command gpt-6-luna fast");
-    expect(headless).toContain("codex exec --model gpt-6-luna");
+    expect(headless).toContain("exec --sandbox workspace-write --model gpt-6-luna");
     expect(headless).toContain("model_reasoning_effort=low");
     expect(interactive).toContain("codex --model gpt-6-luna");
     expect(interactive).toContain("model_reasoning_effort=low");
@@ -374,11 +360,11 @@ describe("Crew CommandCode execution", () => {
     expect(callCrewFunction("resolve_profile deep commandcode")).toBe("Qwen/Qwen3.7-Max");
   });
 
-  test("runs headless CommandCode bounded by --yolo + the CREW_MANAGED guard", () => {
+  test("runs headless CommandCode with the Crew guard and regular permissions", () => {
     const command = callCrewFunction("commandcode_headless_command deepseek/deepseek-v4-pro 'finish task'");
     expect(command).toContain("CREW_MANAGED=1 commandcode -p");
     expect(command).toContain("--model deepseek/deepseek-v4-pro");
-    expect(command).toContain("--yolo");
+    expect(command).not.toContain("--yolo");
     expect(command).toContain("--skip-onboarding -t");
   });
 
@@ -467,11 +453,11 @@ describe("Crew Antigravity execution", () => {
     callCrewFunction(`fake=$(mktemp -d); printf '#!/bin/sh\\n' > "$fake/agy"; chmod +x "$fake/agy"; PATH="$fake:$PATH"; ${body}; rm -rf "$fake"`);
   const withoutAgy = (body: string) => callCrewFunction(`PATH="/usr/bin:/bin"; ${body}`);
 
-  test("launches headless Antigravity bounded by CREW_MANAGED + --dangerously-skip-permissions", () => {
+  test("launches headless Antigravity with regular permissions", () => {
     const command = withAgy("antigravity_headless_command gemini-3.8-flash-high 'finish task'");
     expect(command).toContain("CREW_MANAGED=1 agy -p");
     expect(command).toContain("--model gemini-3.8-flash-high");
-    expect(command).toContain("--dangerously-skip-permissions");
+    expect(command).not.toContain("--dangerously-skip-permissions");
   });
 
   test("launches interactive Antigravity without print or permission flags", () => {

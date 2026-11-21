@@ -56,7 +56,6 @@ description: Use when managing git workflows, reviewing status and diffs, crafti
 - On local feature branches, commit and rebase onto the default branch freely. Push (`git push -u origin <branch>`) and open or update PRs only when the user asked to push or ship.
 - After every branch is merged or rebased into the default branch, delete it locally and on the remote (see `branch-cleanup`).
 - Never push to the deploy branch (`main`, `master`, `production`, `release/*` or whatever branch triggers a deploy); push is blocked there, open a PR instead and let the user merge.
-- Exception: `dev` and `staging` are unrestricted. Commit and push to them directly, even if they deploy.
 - Only force-push a feature branch after a rebase, with `--force-with-lease`, and only on your own unshared branch.
 - Do not include agent names as co-authors or add automated tool trailers unless requested.
 - Verify that working tree is in a clean, consistent state.

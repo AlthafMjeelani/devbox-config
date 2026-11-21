@@ -8,6 +8,22 @@
 # Skip all of it once with: git commit --no-verify
 hook="$(basename "$0")"
 
+if [ "$hook" = pre-push ]; then
+  guard="$(command -v guard-default-branch 2>/dev/null || true)"
+  [ -n "$guard" ] || guard="$HOME/.local/bin/guard-default-branch"
+  if [ -x "$guard" ]; then
+    # Buffer the ref updates for both the global guard and the repo's local hook.
+    updates="$(cat)" || exit 1
+    "$guard" pre-push "$@" <<< "$updates" || exit 1
+    common="$(git rev-parse --git-common-dir 2>/dev/null || true)"
+    local_hook="$common/hooks/$hook"
+    if [ -n "$common" ] && [ -x "$local_hook" ] && ! [ "$local_hook" -ef "$0" ]; then
+      exec "$local_hook" "$@" <<< "$updates"
+    fi
+    exit 0
+  fi
+fi
+
 if [ "$hook" = pre-commit ]; then
   guard="$(command -v guard-default-branch 2>/dev/null || true)"
   [ -n "$guard" ] || guard="$HOME/.local/bin/guard-default-branch"

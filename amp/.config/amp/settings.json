@@ -5,34 +5,6 @@
     {
       "tool": "Bash",
       "matches": {
-        "cmd": "git push origin dev"
-      },
-      "action": "allow"
-    },
-    {
-      "tool": "Bash",
-      "matches": {
-        "cmd": "git push -u origin dev"
-      },
-      "action": "allow"
-    },
-    {
-      "tool": "Bash",
-      "matches": {
-        "cmd": "git push origin staging"
-      },
-      "action": "allow"
-    },
-    {
-      "tool": "Bash",
-      "matches": {
-        "cmd": "git push -u origin staging"
-      },
-      "action": "allow"
-    },
-    {
-      "tool": "Bash",
-      "matches": {
         "cmd": "git push* main"
       },
       "action": "reject"
@@ -48,6 +20,48 @@
       "tool": "Bash",
       "matches": {
         "cmd": "git push*:main*"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push* dev"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push* dev *"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push*:dev*"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push* staging"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push* staging *"
+      },
+      "action": "reject"
+    },
+    {
+      "tool": "Bash",
+      "matches": {
+        "cmd": "git push*:staging*"
       },
       "action": "reject"
     },

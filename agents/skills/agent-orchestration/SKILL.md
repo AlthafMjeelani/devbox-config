@@ -15,7 +15,7 @@ Resolve routine dispatch decisions yourself and bring the user decisions that re
 2. **Decompose** into tasks that touch disjoint files. If two tasks need the same file, sequence them or merge them. Keep each task completable in one sitting.
 3. **Write a task brief** per worker (template below). One brief, one outcome.
 4. **Dispatch** each worker into its own worktree and session:
-   - `crew new "<task>" [--claude|--codex|--kimi|--amp|--commandcode] [--profile fast|standard|deep]` (headless, commits on its own branch, never pushes).
+   - `crew new -b agent/<task-id>-<role> "<task>" [--claude|--codex|--kimi|--amp|--commandcode] [--profile fast|standard|deep]` (headless, reports changes for the orchestrator).
    - When the user names Codex or Claude as the worker, use direct delegation below. Otherwise use Crew.
    - Open one named worker session in Rex or workspace in Herdr for each task.
    - Crew chooses the current terminal backend automatically. Announce the worker name and the command the user can use to watch.
@@ -27,7 +27,7 @@ Resolve routine dispatch decisions yourself and bring the user decisions that re
 
 ## Delegating directly to Codex or Claude
 Stay the orchestrator and launch the named engine headlessly.
-Use the authorized permission bypass on the delegated process, and give the worker a brief with scope, checks, and a report destination.
+Use standard provider permissions and give the worker a brief with scope, checks, and a report destination.
 
 1. **Prepare**: for code changes, give the named worker its own worktree and branch (`git worktree add ../<repo>-<topic> -b <type>/<topic>`).
    For one-off outputs (images, research, drafts), use a scratch directory.
@@ -48,8 +48,8 @@ Use the authorized permission bypass on the delegated process, and give the work
    cd "$worker_dir" || exit 1
    brief=$(cat "$run_dir/BRIEF.md") || exit 1
    case "$engine" in
-     codex) command=(codex exec --dangerously-bypass-approvals-and-sandbox -o "$run_dir/result.md" "$brief") ;;
-     claude) command=(claude -p --dangerously-skip-permissions --verbose --output-format stream-json "$brief") ;;
+     codex) command=(env CREW_MANAGED=1 codex -a never exec --sandbox workspace-write -o "$run_dir/result.md" "$brief") ;;
+     claude) command=(env CREW_MANAGED=1 claude -p --verbose --output-format stream-json "$brief") ;;
      *) exit 2 ;;
    esac
    "${command[@]}" </dev/null 2>&1 | tee "$run_dir/worker.log"

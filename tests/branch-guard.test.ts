@@ -42,21 +42,21 @@ describe("guard-default-branch check", () => {
   });
 });
 
-describe("dev and staging are never protected", () => {
-  test("check allows dev and staging, even as the repo's default branch", () => {
+describe("shared branch protection", () => {
+  test("check blocks dev and staging, even as the repo's default branch", () => {
     for (const b of ["dev", "staging"]) {
       const dir = newRepo(b);
       sh(`git remote add origin https://example.invalid/r.git && git update-ref refs/remotes/origin/${b} HEAD && git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/${b}`, dir);
-      expect(sh(`${guard} check .`, dir).code).toBe(0);
+      expect(sh(`${guard} check .`, dir).code).toBe(1);
     }
   });
 });
 
 describe("claude-push-hook", () => {
   const push = (dir: string, command: string) => sh(`${guard} claude-push-hook`, dir, {}, JSON.stringify({ cwd: dir, tool_input: { command } }));
-  test("allows pushes to dev, staging and feature branches", () => {
-    const dir = newRepo("dev");
-    for (const c of ["git push origin dev", "git push -u origin staging", "git push", "git push --force-with-lease origin feat/x", "git push origin --delete feat/x", "git status", "echo push"]) {
+  test("allows feature branch pushes", () => {
+    const dir = newRepo("feat/x");
+    for (const c of [ "git push", "git push --force-with-lease origin feat/x", "git push origin --delete feat/x", "git status", "echo push"]) {
       expect([c, push(dir, c).code]).toEqual([c, 0]);
     }
   });
@@ -64,6 +64,10 @@ describe("claude-push-hook", () => {
     const dir = newRepo("feat/x");
     for (const c of [
       "git push origin main",
+      "git push origin dev",
+      "git push -u origin staging",
+      "git push origin :",
+      "git push origin refs/heads/*:refs/heads/*",
       "git push -f origin master",
       "git push origin HEAD:develop",
       "git push origin +feat/x:main",
