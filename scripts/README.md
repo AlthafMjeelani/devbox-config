@@ -46,7 +46,7 @@ Exits 1 on any FAIL (tracked `.env`, not ignored, ignored example, real-looking 
 
 ## guard-default-branch - keep agents off main
 
-Blocks commits and Claude Code edits on `main`, `master`, `develop`, `trunk` and a repo's default branch, and Claude Code pushes that update those branches. `dev` and `staging` are never protected. Used by the global git `pre-commit` hook and two Claude Code `PreToolUse` hooks.
+Blocks commits and Claude Code edits on `main`, `master`, `develop`, `trunk` and a repo's default branch, and Claude Code pushes that update those branches. `dev` and `staging` are protected too. Used by the global Git `pre-commit` and `pre-push` hooks and two Claude Code `PreToolUse` hooks.
 
 ```bash
 guard-default-branch check [dir]            # exit 1 on a protected branch
@@ -194,25 +194,15 @@ before the task finishes.
 Set `CREW_AMP_SETTINGS` only when supplying equivalent execute-mode settings.
 The guard plugin must be installed at Amp's system plugin path via `make restow-amp`.
 
-`crew` is **task-first**: give it the task and the branch is AI-named for you
-(via `ai-branch-name`, printed as `-> branch: ...`). Pass `-b/--branch <name>`
-only when you want to reuse or force a specific branch.
+Assign an explicit worker branch tied to the task before dispatch.
 
 ```bash
-crew new "add dark mode"             # standard profile: Terra / Sonnet / Terra
-crew new --profile fast "update README examples"
-crew new --profile deep --claude "fix transaction race" --attach
-crew new --profile fast --kimi "update shell completion docs"
-crew new --profile standard --amp "add API pagination"
-crew new --profile standard --commandcode "add a /health endpoint"
-crew new -b feat/dark "add toggle"   # force the branch name
-crew new -b spike-y                  # no task -> interactive opencode in the worktree
-crew status                          # branch | engine | profile | model | running/done(rc) | commits-ahead
-crew logs feat/dark -f               # follow a crewmate's captured output
-crew watch                           # bell + notify-send when a crewmate finishes or blocks
-crew ls                              # list active crew sessions / workspaces
-crew attach feat/dark                # attach / switch-client to a crewmate
-crew stop feat/dark -D               # kill session (-D also removes worktree + branch)
+crew new -b agent/142-docs --claude "Update the README examples"
+crew status
+crew logs agent/142-docs -f
+crew attach agent/142-docs
+crew stop agent/142-docs
+crew cleanup agent/142-docs  # from the integration branch after committing and integrating the work
 ```
 
 Profiles explicitly select the model for every engine rather than inheriting machine defaults:
@@ -231,12 +221,8 @@ Amp is opt-in with `--amp` and tasked Amp runs use execute mode on both backends
 remaining open after a Herdr crewmate finishes.
 Interactive Amp remains available with `crew new -b <branch> --amp`.
 Amp `deep` uses `high`; Crew never selects `ultra` automatically.
-CommandCode is opt-in with `--commandcode`. Its headless (`-p`) mode is read-only and cannot edit
-or commit without `--yolo`, so tasked CommandCode crewmates run `--yolo` bounded by the required
-`CREW_MANAGED`-gated guard hook (`~/.commandcode/hooks/crew-guard.sh`), which denies
-push/sudo/hard-reset/clean/dangerous rm and fails closed; Crew refuses to launch one if the hook is
-missing (`make restow-commandcode`). Interactive CommandCode remains available with
-`crew new -b <branch> --commandcode` and never uses `--yolo`.
+CommandCode headless mode is read-only and uses the required Crew guard hook.
+For attended provider approvals, use `crew new -b <branch> --commandcode` without a task.
 
 crew is **scoped per repository**: sessions/workspaces are named `crew_<repo-key>_<branch>` and
 state lives in `~/.local/state/crew/<repo-key>/<branch>/` (`branch`, `worktree`, `session`, `task`,
@@ -244,7 +230,7 @@ state lives in `~/.local/state/crew/<repo-key>/<branch>/` (`branch`, `worktree`,
 The repo key is derived from the shared `--git-common-dir`, so it is stable from the
 main repo or any of its worktrees. `crew ls`/`status`/`watch` show only the current repo's
 crewmates (two repos can each run a `feat-x` without colliding); pass `--all` for the cross-repo
-view. This is what `crew status`, `crew logs`, and `crew watch` read and `crew stop` clears. Run `crew watch`
+view. This is what `crew status`, `crew logs`, and `crew watch` read and `crew stop` retains. Run `crew watch`
 in its own pane for zero-token, event-driven alerts (bell + `notify-send`) the moment a crewmate
 is ready or blocked - the push layer a chat agent cannot provide on its own. Tab completion (`_crew`)
 offers subcommands, `new` flags, and live sessions for `attach`/`stop`. Prefer the captain?
@@ -254,62 +240,17 @@ own worktree/background orchestration.
 
 ## gate - local AI ship gate
 
-`gate` validates a branch's committed work in a **disposable worktree**, then pushes and
-opens a PR only if the gate passes. Our own take on no-mistakes - no external binary,
-built on `git-wt` + `opencode`/`claude`/`codex`/`kimi`/`amp`/`commandcode` + `gh`.
+Gate validates the current task branch in a disposable worktree. Configure and commit deterministic test and lint commands in `.gate.sh`.
 
 ```bash
-gate init                          # optional: seed OpenCode .gate.sh overrides
-gate init --engine kimi            # optional Kimi variant
-gate init --engine amp             # optional Amp variant; uses medium mode
-gate init --engine commandcode     # optional CommandCode variant; Qwen3.7-Max review, DeepSeek V4 Pro fixes
-gate status        # show the resolved config
-gate run [branch]  # review → test → docs → lint (+auto-fix) → push → PR → CI monitor
+gate init --engine claude
+gate status
+gate run          # local review and verification
+gate run --ship   # publish the verified commit and open a draft PR with authorization
 ```
 
-Pipeline: a **structured review** (JSON findings classified
-`auto_fix` vs `ask_user` - `auto_fix` are applied automatically; `ask_user` are a human-approval
-gate: prompted interactively, or blocked when headless), then `test` → `docs` → `lint` stages.
-If `GATE_TEST` or `GATE_LINT` is set, that deterministic command runs with a bounded auto-fix loop.
-If either is empty, the build agent detects and runs relevant checks for the repo.
-Docs run only when `GATE_DOCS` is set; empty docs is skipped by default.
-On pass it fast-forwards
-your local branch, pushes, and opens a PR; with `GATE_WATCH_CI=1` it then watches the PR's checks
-and auto-fixes CI failures from the logs. On an unfixable failure (or a blocked review) it
-**escalates** - nothing is pushed and the disposable worktree is kept. A review evidence trail is
-written under `GATE_EVIDENCE_DIR` (gitignored). Optional overrides live in `.gate.sh` (plain sourced bash):
-
-```bash
-GATE_TEST=""                                                     # empty = agent auto-detect
-GATE_DOCS=""                                                     # empty = skip
-GATE_LINT=""                                                     # empty = agent auto-detect
-# GATE_TEST="pnpm test"
-# GATE_LINT="pnpm lint"
-# GATE_DOCS="pnpm docs:check"
-GATE_REVIEW_CMD='gate_review_opencode'                            # "" to skip
-GATE_REVIEW_APPROVE=1        # 1 = gate ask_user findings; 0 = informational
-GATE_FIX_CMD='opencode run "$GATE_PROMPT" --agent build --auto'
-GATE_MAX_ROUNDS=3
-GATE_EVIDENCE_DIR=".gate/evidence"
-GATE_WATCH_CI=0             # 1 = watch CI after the PR and auto-fix failures
-GATE_PUSH_REMOTE="origin"
-```
-
-`gate init --engine amp` uses Amp `medium` mode for review, fixes, and agent-detected checks.
-It applies minimal shared settings and requires the Amp workflow-guardrails plugin to reject risky
-direct shell commands when no approval UI is available.
-Override the execute-mode settings path with `GATE_AMP_SETTINGS`.
-The guard plugin must be installed at Amp's system plugin path via `make restow-amp`.
-`gate init --engine commandcode` reviews with Qwen3.7-Max in read-only `-p` mode (no `--yolo`) and
-applies fixes with DeepSeek V4 Pro under `--yolo`, bounded by the required `CREW_MANAGED`-gated guard
-hook; the fix stage fails closed if the hook is missing (`make restow-commandcode`).
-Gate never selects Amp `high` or `ultra` modes.
-
-The LLM only classifies findings; you approve the judgment calls (or a headless run blocks on
-them), so an LLM verdict is never trusted as an exit code. Commit your work before running - the
-gate validates commits, and it refuses to run on the default branch. Requires `jq` and `gh`.
-`gate` inherits the shell environment you run it from. Put worktree-specific bootstrap in
-`.worktrees-setup`, for example copying `.env` from `$GIT_WT_MAIN` and installing dependencies.
+Blocked worktrees remain available for inspection. Integrate any review fixes before retrying.
+See the [orchestrator-first workflow](../docs/ORCHESTRATOR-FIRST.md) for setup and publishing details.
 
 ## agentic-init - scaffold agentic files into a repo
 

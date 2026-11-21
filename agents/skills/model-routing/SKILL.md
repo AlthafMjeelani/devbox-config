@@ -27,7 +27,7 @@ Antigravity: `gemini-3.1-pro-high` for deep and standard, `gemini-3.8-flash-*` f
 ## Per tool
 - Claude Code: `/model` to switch; subagents set `model:` in their frontmatter (generated from `models.json`).
 - Codex: `codex -p fast|standard|deep` (profiles in `~/.codex/config.toml`), or `-m <model> -c model_reasoning_effort="low"`; `/model` inside a session.
-- crew: `crew new "<task>" --codex --profile fast|standard|deep`.
+- crew: `crew new -b agent/<task-id>-<role> "<task>" --codex --profile fast|standard|deep`.
 
 ## Automatic routing (all agents)
 Before starting a task, or when splitting work into subtasks, run:

@@ -9,16 +9,16 @@
 #   guard-default-branch install-claude-hook  Merge that hook into ~/.claude/settings.json (idempotent, keeps a backup).
 #
 # Protected: main, master, develop, trunk, and the repo's own default branch (origin/HEAD).
-# Never protected: dev and staging. Agents may commit on them and push to them directly.
+# Dev and staging are also protected. pre-push checks the actual remote refs.
 # Allow on purpose:  ALLOW_DEFAULT_BRANCH=1 <command>      one time
 #                    git config devbox.allowDefaultBranch true   for one repo (for example your dotfiles)
 set -euo pipefail
 
 protected() {
-  local branch="$1" dir="$2" default
-  case "$branch" in dev|staging) return 1 ;; main|master|develop|trunk) return 0 ;; esac
-  default="$(git -C "$dir" symbolic-ref --short -q refs/remotes/origin/HEAD 2>/dev/null || true)"
-  [ -n "$default" ] && [ "$branch" = "${default#origin/}" ]
+  local branch="$1" dir="$2" remote="${3:-origin}" default
+  case "$branch" in main|master|dev|develop|staging|trunk) return 0 ;; esac
+  default="$(git -C "$dir" symbolic-ref --short -q "refs/remotes/$remote/HEAD" 2>/dev/null || true)"
+  [ -n "$default" ] && [ "$branch" = "${default#"$remote/"}" ]
 }
 
 allowed() {
@@ -34,7 +34,7 @@ check() {
   protected "$branch" "$dir" || return 0
   allowed "$dir" && return 0
   cat >&2 <<MSG
-Blocked: you are on '$branch', the default branch. Work on a feature branch instead:
+Blocked: you are on '$branch', a protected branch. Work on a feature branch instead:
   git switch -c feat/<short-topic>      (or fix/, chore/, docs/, refactor/)
 One-off override: ALLOW_DEFAULT_BRANCH=1.  Per repo: git config devbox.allowDefaultBranch true
 MSG
@@ -59,8 +59,8 @@ push_targets() {
   while [ $# -gt 0 ]; do
     arg="$1"; shift
     case "$arg" in
-      --all|--mirror|--branches) echo '*' ;;
-      -o|--push-option|--repo|--receive-pack|--exec) shift ;;
+      --all|--mirror|--branches|--prune) echo '*' ;;
+      -o|--push-option|--repo|--receive-pack|--exec) [ "$#" -eq 0 ] || shift ;;
       -*) ;;
       *) positional+=("$arg") ;;
     esac
@@ -74,7 +74,9 @@ push_targets() {
     return 0
   fi
   for arg in "${positional[@]:1}"; do
-    arg="${arg#+}"; dst="${arg##*:}"
+    arg="${arg#+}"
+    case "$arg" in :|*\**) echo "*"; continue ;; esac
+    dst="${arg##*:}"
     [ -n "$dst" ] && [ "$dst" != HEAD ] || dst="$(git -C "$dir" symbolic-ref --short -q HEAD 2>/dev/null || true)"
     echo "${dst#refs/heads/}"
   done
@@ -105,12 +107,16 @@ push_check() {
       i=$((i + 1))
     done
     [ "${words[$i]:-}" = push ] || continue
+    if [ "${CREW_MANAGED:-}" = 1 ]; then
+      echo "Blocked: delegated workers cannot push." >&2
+      return 1
+    fi
     while IFS= read -r target; do
       [ -n "$target" ] || continue
       if [ "$target" = '*' ] || protected "$target" "$dir"; then
         allowed "$dir" && continue
         cat >&2 <<MSG
-Blocked: this push updates '$target', a protected branch. Push a feature branch, or dev/staging, instead.
+Blocked: this push updates '$target', a protected branch. Use an authorized feature-branch pull request.
 Ask the user to push protected branches themselves.  Per repo: git config devbox.allowDefaultBranch true
 MSG
         return 1
@@ -152,6 +158,26 @@ install_claude_hook() {
 }
 
 case "${1:-}" in
+  check-branch)
+    [ "$#" -eq 2 ] && git check-ref-format "refs/heads/$2" || exit 1
+    if protected "$2" .; then exit 1; fi
+    ;;
+  pre-push)
+    if [ "${CREW_MANAGED:-}" = 1 ]; then
+      echo "Blocked: delegated workers cannot push." >&2
+      exit 1
+    fi
+    while read -r _ _ remote_ref _; do
+      case "$remote_ref" in
+        refs/heads/*)
+          if protected "${remote_ref#refs/heads/}" . "${2:-origin}" && ! allowed .; then
+            printf 'Blocked: cannot push protected branch %s. Use a pull request.\n' "${remote_ref#refs/heads/}" >&2
+            exit 1
+          fi
+          ;;
+      esac
+    done
+    ;;
   check) shift; check "${1:-.}" ;;
   claude-hook) claude_hook ;;
   claude-push-hook) claude_push_hook ;;

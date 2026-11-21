@@ -44,7 +44,7 @@ for (const directory of readdirSync(skillsRoot, { withFileTypes: true }).filter(
   if (lines > 500) failure(`${file} has ${lines} lines (max 500); move detail into references/`);
 }
 
-// Enforced policy: agents may push dev/staging, but never protected branches; the default branch stays guarded.
+// Shared branch permissions are verified by the policy and branch guard suites.
 try {
   const claude = JSON.parse(readFileSync(join(repo, "agents/.claude/settings.json"), "utf8"));
   if (!claude.permissions?.deny?.includes("Bash(git push origin main)")) failure("agents/.claude/settings.json must deny pushing main");
@@ -82,7 +82,7 @@ for (const file of bashScripts) run(["bash", "-n", file]);
 if (Bun.which("shellcheck")) run(["shellcheck", ...bashScripts]);
 else console.warn("SKIP: shellcheck is not installed");
 
-run(["bun", "test", "tests/agent-workflow.test.ts", "tests/ai-account.test.ts", "tests/artifact-design.test.ts"]);
+run(["bun", "test", "tests/agent-workflow.test.ts", "tests/agent-policy.test.ts", "tests/branch-guard.test.ts", "tests/orchestrator-git.test.ts", "tests/ai-account.test.ts", "tests/artifact-design.test.ts"]);
 
 if (Bun.which("amp")) {
   run([

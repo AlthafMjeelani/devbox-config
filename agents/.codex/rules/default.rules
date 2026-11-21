@@ -59,25 +59,13 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["git", "push", "origin", ["dev", "staging", "HEAD:dev", "HEAD:staging"]],
-    decision = "allow",
-    justification = "dev and staging are not restricted; agents may push to them directly",
-)
-
-prefix_rule(
-    pattern = ["git", "push", ["-u", "--set-upstream"], "origin", ["dev", "staging"]],
-    decision = "allow",
-    justification = "dev and staging are not restricted; agents may push to them directly",
-)
-
-prefix_rule(
-    pattern = ["git", "push", "origin", ["main", "master", "develop", "trunk", "HEAD:main", "HEAD:master", "HEAD:develop", "HEAD:trunk"]],
+    pattern = ["git", "push", "origin", ["main", "master", "develop", "trunk", "dev", "staging", "HEAD:main", "HEAD:master", "HEAD:develop", "HEAD:trunk", "HEAD:dev", "HEAD:staging"]],
     decision = "forbidden",
     justification = "Never push protected branches; ask the user to push them explicitly after review",
 )
 
 prefix_rule(
-    pattern = ["git", "push", ["-u", "--set-upstream", "-f", "--force", "--force-with-lease"], "origin", ["main", "master", "develop", "trunk"]],
+    pattern = ["git", "push", ["-u", "--set-upstream", "-f", "--force", "--force-with-lease"], "origin", ["main", "master", "develop", "trunk", "dev", "staging"]],
     decision = "forbidden",
     justification = "Never push protected branches; ask the user to push them explicitly after review",
 )
@@ -105,6 +93,12 @@ prefix_rule(
     decision = "allow",
     justification = "Read-only process listing",
 )
-prefix_rule(pattern=["node", "/private/tmp/vf-reference-browser.cjs"], decision="allow")
 prefix_rule(pattern=["make", "agents-sync"], decision="allow")
 prefix_rule(pattern=["make", "verify-agent-workflow"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "fvm flutter test --no-pub --reporter expanded > /tmp/vf-stable-full.log 2>&1"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "fvm flutter test --no-pub --reporter expanded test/service/distributor_invoice/import_layout_regression_test.dart /tmp/vf_assert_pdf_test.dart > /tmp/vf-verified.log 2>&1"], decision="allow")
+prefix_rule(pattern=["fvm", "flutter", "devices"], decision="allow")
+prefix_rule(pattern=["fvm", "flutter", "run", "-d", "emulator-5554", "--dart-define-from-file=.env"], decision="allow")
+prefix_rule(pattern=["git", "switch", "-c"], decision="allow")
+prefix_rule(pattern=["/bin/zsh", "-lc", "amp plugins exec \"$PWD/amp/.config/amp/plugins/workflow-guardrails.ts\" tool.call --data '{\"toolUseID\":\"tool-test\",\"tool\":\"shell_command\",\"input\":{\"command\":\"git status --short\"},\"thread\":{\"id\":\"T-00000000-0000-0000-0000-000000000000\"}}'"], decision="allow")
+prefix_rule(pattern=["git", "add", "-A"], decision="allow")

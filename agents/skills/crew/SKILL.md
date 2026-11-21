@@ -1,6 +1,6 @@
 ---
 name: crew
-description: Use when orchestrating several agents in parallel - split a request into independent features, dispatch one crewmate per feature with the `crew` CLI, then stop and report status on request (not continuously) so ready branches can be reviewed and shipped.
+description: Use when orchestrating several agents in parallel - split a request into independent features, dispatch independent workers with the `crew` CLI, monitor them, and integrate their results into one task branch.
 compatibility: Requires the local Crew, git-wt, Herdr, Rex, or tmux, and agent CLI setup. In Amp orbs, use native Amp delegation or separate orb threads instead.
 ---
 ## What it is
@@ -39,7 +39,7 @@ Follow the host’s native delegation path in an Amp orb.
    ## Allowed authority
    - May edit:
    - May add dependencies:
-   - May commit: yes
+   - Orchestrator stages and commits: yes
    - May push/publish/deploy: no
    ## Verification
    - Focused command:
@@ -56,25 +56,17 @@ Follow the host’s native delegation path in an Amp orb.
    than asking the crewmate to guess.
 3. **Dispatch** one crewmate per feature:
    ```bash
-   crew new "<self-contained task>"
-   # Or force a branch name:
-   crew new -b <branch> "<self-contained task>"
+   crew new -b agent/<task-id>-<role> "<self-contained task>"
    ```
    OpenCode is the default engine. Add `--claude`, `--codex`, `--kimi`, `--amp`, `--commandcode`, or
    `--antigravity` to select another engine. Kimi tasks use regular K2.7 for `fast` and `standard`, K3 for `deep`, and run
    headlessly because Kimi has no documented seeded-prompt interactive launch mode. Amp uses
    `low` for `fast` and `medium` for both `standard` and `deep`; Crew never selects Amp's costly
    `high` or `ultra` modes. CommandCode uses DeepSeek V4 Flash for `fast`, DeepSeek V4 Pro for
-   `standard`, and Qwen3.7-Max for `deep`; its headless (`-p`) mode cannot write without `--yolo`,
-   so tasked crewmates run `--yolo` bounded by the required `CREW_MANAGED`-gated guard hook
-   (`crew-guard.sh`), which denies push/sudo/hard-reset/clean/rm. Crew refuses to launch a
-   CommandCode crewmate if that hook is missing. Antigravity uses `gemini-3.8-flash-low` for `fast`,
-   `gemini-3.8-flash-high` for `standard`, and `gemini-3.1-pro-high` for `deep` under bounded
-   `--dangerously-skip-permissions`. Codex uses `gpt-6-luna` with reasoning effort `low` for
-   `fast`, `gpt-6.1-terra` for `standard`, and `gpt-6.1-sol` for `deep`; reasoning effort is a
-   separate Codex setting and must not be appended to the model slug.
-   Tasked Codex, Claude, and Kimi workers use their worker-only permission bypass modes.
-   OpenCode and Amp use their existing automated execution policies.
+   `standard`, and Qwen3.7-Max for `deep`. CommandCode headless runs use the required Crew guard hook in read-only mode.
+   Antigravity and Kimi use standard provider permissions.
+   Codex uses the workspace-write sandbox, with no shared Git directory added to it.
+   Use an attended branch-only session when a provider requires interactive approvals.
 4. **Make workers visible.** Announce each branch and its session or workspace label after launch.
    The user can open it from the terminal sidebar or run `crew attach <branch>`.
    Keep the orchestrator in the original pane and leave finished worker displays available for inspection.
@@ -85,10 +77,7 @@ Follow the host’s native delegation path in an Amp orb.
    Report the result to the user from the orchestrator session.
 
 ## Rules
-- Never push or merge. Hand ready branches to the user to review (`/review-diff`) and ship
-  (`/ship-gate`). A crewmate `done:0` means it committed, not that the work is correct.
-- Choose independent features. If a plan needs shared-file coordination, say so and sequence it
-  rather than dispatching colliding crewmates.
-- One crewmate per branch. Re-running `crew new` on an existing branch reuses its session.
-- Tear down finished processes with `crew stop <branch>`.
-- Use `crew stop -D <branch>` only after verifying that the work is merged or disposable and obtaining approval to delete the worktree and branch.
+- The orchestrator reviews worker diffs, commits accepted changes, and integrates them into one task branch before validation.
+- Use `--resume` for a reviewed existing worktree.
+- `crew stop <branch>` stops the session and preserves files and logs.
+- Run `crew cleanup <branch>` from the integration branch after work is clean and its commits are reachable.

@@ -237,87 +237,19 @@ Worktrees are **siblings** of the repo (`<repo>.worktrees/<branch>`), never nest
 they're never committed or scanned. If an executable **`.worktrees-setup`** exists at the repo
 root, `wt`/`git wt new` runs it inside the new worktree (copy `.env`, install deps, warm caches).
 
-**`crew` - many agents at once.** Our lightweight orchestrator (our own take on firstmate - no
-external scripts). Each crewmate = a branch in its own `wt` worktree running an agent in its own
-detached **tmux session or background Herdr workspace** (backend auto-detected at spawn: Herdr
-inside Herdr, tmux otherwise; `CREW_BACKEND=tmux|herdr` forces one).
-On both backends, every tasked crewmate runs in bounded non-interactive mode, commits, and exits.
-A branch-only crewmate without a task remains interactive.
-A crewmate with a task runs **bounded**: it may edit, run tests, and
-commit on its branch, then stops - it never pushes. Each engine is constrained differently but to
-the same effect - auto-approve everything except an explicit deny-list:
-`opencode` via `--agent build --auto` plus a Crew-only global subagent policy (auto-approves the
-primary agent and delegated subagents, but still denies `git push`/`sudo`/hard-reset/`git clean`/
-dangerous `rm -rf`); `claude` via `--permission-mode acceptEdits` + a
-`git push`/`sudo`/hard-reset deny-list; `codex` via the `workspace-write` sandbox (network off, so
-push is blocked); Amp requires the stowed `workflow-guardrails` plugin, which parses direct shell
-commands and rejects risky operations when no interactive approval surface exists.
-CommandCode is the one exception on the *flag*: its headless (`-p`) mode is read-only and cannot
-edit or commit without `--yolo`, so a tasked CommandCode crewmate runs `--yolo` **bounded by the
-required `CREW_MANAGED`-gated PreToolUse guard hook** (`crew-guard.sh`), which denies
-`git push`/`sudo`/hard-reset/`git clean`/dangerous `rm`. Functionally it is the same "auto-approve
-except a deny-list" as the others - the guard, not the flag, is what bounds it - but note the
-failure mode differs: the others fail *safe* if their config breaks, whereas CommandCode under
-`--yolo` fails *open* if the hook is bypassed. The hook fails closed on any error, and Crew/Gate
-refuse to launch a CommandCode run when the hook is missing, to keep that residual risk small.
-The guard is a no-op outside `CREW_MANAGED`, so your interactive CommandCode sessions can still push.
-Headless `opencode run` has no TTY to approve prompts, so
-**`--auto` and the stowed subagent settings are required**. OpenCode does not propagate
-`--auto` to delegated subagents, so Crew injects the global bounded policy through
-`OPENCODE_CONFIG_CONTENT` to prevent invisible review permission prompts from hanging a run.
+**`crew` - parallel workers.** Use an explicit task-linked branch for each independent assignment.
+Crew launches the selected engine in Rex, Herdr, or tmux and records progress in `crew status` and `crew logs`.
+The orchestrator reviews changes, stages commits, and integrates them into a single task branch.
 
 ```bash
-crew new "<task>"            # standard profile (the default): AI-name a branch, then worktree + session/workspace running:
-                             #   opencode run "<task>" --agent build --auto
-                              #   --profile fast|standard|deep -> explicit per-engine model tier
-                              #   -b/--branch <name> -> force/reuse a branch (no task -> interactive)
-                             #   --claude / --codex / --kimi / --amp / --commandcode -> select another engine
-                             #   --attach  -> jump into the session now
-                             #   --start <ref> -> branch from <ref>
-crew status [<branch>]       # table: branch | running/done(rc) | commits-ahead | last log line
-crew logs <branch> [-f]      # print (or -f follow) a crewmate's captured output
-crew watch [-n SECS]         # notify (bell + notify-send) when a crewmate finishes or blocks
-crew ls                      # list active crew sessions / workspaces
-                             #   status/watch/ls take --all to span every repo (default: this repo)
-crew attach <branch>         # attach / switch-client to a crewmate
-crew stop <branch> -D        # kill the session (-D also removes worktree + branch)
+crew new -b agent/142-docs --claude "Update README usage and verify the commands"
+crew status agent/142-docs
+crew logs agent/142-docs -f
+crew stop agent/142-docs
+crew cleanup agent/142-docs  # from the integration branch after the worker commits are integrated
 ```
 
-**crew is scoped per repository.** Sessions and state are namespaced by a repo key (derived from
-the shared `--git-common-dir`, so it is identical from the main repo or any of its worktrees).
-`crew ls`/`status`/`watch` therefore show only the current repo's crewmates - two different repos can
-each run a `feat-x` crewmate without colliding. Pass `--all` for the cross-repo view. Per-crewmate
-state lives in `~/.local/state/crew/<repo-key>/<branch>/` (`branch`, `worktree`, `session`, `task`,
-`log`, `status`), which is what `crew status`/`crew logs` read and `crew stop` clears.
-
-**Two ways to drive it:**
-
-*Manual* - you run `crew` yourself and check in when you like:
-
-```bash
-crew new "fix the flaky login test"        # -> branch: fix/flaky-login (AI-named)
-crew new "add a dark-mode toggle to settings"
-crew new --profile fast --kimi "update shell completion docs"
-crew new --profile standard --amp "add API pagination"
-crew new --profile standard --commandcode "add a /health endpoint"
-crew status                   # see both: running -> done:0 with commits-ahead
-crew logs fix/flaky-login     # read what a crewmate did (or -f to follow)
-# when each shows done with commits: review the branch (Playbook 7), ship via the gate (Playbook 11)
-crew stop fix/flaky-login -D
-```
-
-*Captain-driven* - converse with **one** agent that dispatches and monitors for you (the firstmate
-feel). `/crew` uses the shared `crew` skill, which makes the current agent the captain for that task:
-
-```bash
-/crew "add a dark-mode toggle, fix the flaky login test, and add a /health endpoint"
-```
-
-The captain splits the request into independent features, runs `crew new` per feature, reports what
-it dispatched, then **stops** and hands control back. It does not sit in a polling loop; ask it to
-check in and it runs `crew status`/`crew logs` **once**, surfaces any `BLOCKED:` reason, and tells
-you which branches are `done` with commits - **ready for review**. The captain never edits code,
-pushes, or merges; it hands the ready branches back to you.
+See the [orchestrator-first workflow](ORCHESTRATOR-FIRST.md) for permissions, recovery, and safe cleanup.
 
 Crew profiles select explicit models for every engine rather than inheriting machine defaults:
 
@@ -387,74 +319,17 @@ gate init --engine amp   # writes an Amp variant using medium mode
 gate init --engine commandcode  # writes a CommandCode variant (Qwen3.7-Max review, DeepSeek V4 Pro fixes)
 ```
 
-`gate run` works without `.gate.sh`.
-When `GATE_TEST` or `GATE_LINT` is empty, the build agent detects and runs relevant checks.
-When `GATE_DOCS` is empty, docs are skipped by default.
-Use `.gate.sh` (plain sourced bash, not YAML) only for deterministic overrides:
-`GATE_TEST`, `GATE_DOCS`, `GATE_LINT`, `GATE_REVIEW_CMD` (structured JSON review; empty to skip),
-`GATE_REVIEW_APPROVE` (1 = gate `ask_user` findings, 0 = informational), `GATE_FIX_CMD` (how auto-fixes
-are requested), `GATE_MAX_ROUNDS`, `GATE_EVIDENCE_DIR`, `GATE_WATCH_CI`, `GATE_PUSH_REMOTE`.
-The default OpenCode fix command uses `--auto` inside the disposable gate worktree; dangerous commands
-remain denied by `opencode.json`.
-The opt-in Kimi variant uses K3 for structured review and regular K2.7 Code for fixes and
-agent-detected validation.
-It uses Kimi's documented `stream-json` mode to pass only the final Assistant payload into the gate.
-The opt-in Amp gate variant uses `medium` for review, fixes, and agent-detected validation.
-It uses minimal shared settings plus the required Amp workflow-guardrails plugin, so unattended
-runs reject risky direct shell commands without blocking harmless quoted text.
-Override the execute-mode settings path with `GATE_AMP_SETTINGS`.
-The guard plugin must be installed at Amp's system plugin path via `make restow-amp`.
-Gate never selects Amp `high` or `ultra` modes.
-The opt-in CommandCode gate variant reviews with Qwen3.7-Max in read-only `-p` mode (no `--yolo`)
-and applies fixes with DeepSeek V4 Pro under `--yolo`, bounded by the required `CREW_MANAGED`-gated
-guard hook (`crew-guard.sh`); the fix stage fails closed if the hook is missing.
-The hook must be installed via `make restow-commandcode`.
-
-`gate` inherits the shell environment you run it from.
-Put worktree-specific bootstrap in `.worktrees-setup`, for example:
+Configure deterministic `GATE_TEST` and `GATE_LINT` commands in a committed `.gate.sh`.
+Gate runs review and checks in a disposable worktree and preserves it if checks fail or review proposes commits.
 
 ```bash
-#!/usr/bin/env bash
-cp "$GIT_WT_MAIN/.env" . 2>/dev/null || true
-pnpm install --frozen-lockfile
+gate run          # verify the task branch locally
+gate run --ship   # with authorization, publish the verified commit and open a draft PR
 ```
 
-**Ship a branch:**
+With `GATE_WATCH_CI=1`, Gate watches the PR checks and returns their result.
+See the [orchestrator-first workflow](ORCHESTRATOR-FIRST.md) for integration, permissions, and branch protection.
 
-```bash
-# commit your work first - the gate validates commits, not the dirty tree
-/ship-gate        # (or: gate run [branch])
-```
-
-Pipeline:
-
-1. Copies the branch HEAD into a **disposable worktree** - your working tree is untouched.
-2. **review** - *structured*: the reviewer emits JSON findings classified `auto_fix` vs
-   `ask_user`. `auto_fix` findings are applied automatically; `ask_user` findings are a **human-approval
-   gate** - prompted interactively (approve / fix / block), or **blocked** when headless
-   (`GATE_REVIEW_APPROVE=0` makes them informational). Evidence is written under `GATE_EVIDENCE_DIR`.
-   The LLM only classifies; you decide, so we still never trust an LLM verdict as an exit code.
-3. **test** → **docs** → **lint** - explicit commands run with a bounded auto-fix loop; empty
-   test/lint delegates detection and validation to the build agent, while empty docs is skipped.
-4. All green → fast-forward your local branch, push the validated commits, `gh pr create`.
-5. **CI monitor** (opt-in, `GATE_WATCH_CI=1`): watch the PR's checks; on failure, pull the failing
-   logs, auto-fix, push, and re-watch, bounded by `GATE_MAX_ROUNDS`.
-6. Can't fix within the cap (or a blocked review) → **escalates**: nothing is pushed, and the
-   disposable worktree is kept for you to inspect.
-
-**How it fits with reviews:** the gate's structured review auto-fixes the mechanical stuff and makes
-you approve the judgment calls, but the deep human-in-the-loop review (Playbook 7 - `ceo-review`,
-`security-review`, `claude-review`, `second-pass`) still happens **before** you run the gate. The gate
-then enforces the mechanical bar (tests + docs + lint), opens the PR, and (opt-in) babysits CI.
-**No yolo:** push/PR happen only after every enforced stage passes, `ask_user` findings block a
-headless run, and the gate refuses to run on the default branch.
-
-**Parity note:** this closes the gaps with Kun Chen's no-mistakes on *workflow* (docs stage, structured
-auto-fix/ask-user review with evidence, CI monitor). We deliberately keep the *tech stack* different -
-a ~350-line bash script, not a Go binary or git-proxy - so a plain `git push` still bypasses it (run
-`/ship-gate` to gate).
-
----
 
 ## Part 3 - Reference
 

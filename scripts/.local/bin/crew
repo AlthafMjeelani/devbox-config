@@ -8,14 +8,13 @@
 # firstmate idea.
 #
 # Usage:
-#   crew new <task...>            Create a worktree + session/workspace and launch an agent.
+#   crew new -b <branch> <task...>            Create a worktree + session/workspace and launch an agent.
 #                                   The branch is AI-named from the task (printed as
 #                                   "-> branch: ..."); no need to invent a name.
 #                                   A task always runs headlessly, implements + commits,
 #                                   then exits.
 #                                   No task -> interactive agent TUI in the worktree.
-#                                 Flags: -b/--branch <name> (reuse/force a branch instead
-#                                        of AI-naming; no task -> interactive agent),
+#                                 Flags: -b/--branch <name> (explicit branch), --resume,
 #                                        --attach (jump to it), --claude, --codex, --kimi, --amp,
 #                                        --commandcode,
 #                                        --headless (accepted for compatibility; tasked runs
@@ -26,13 +25,13 @@
 #   crew watch [-n SECS] [-1] [--all]  Notify (notify-send + bell) when a crewmate finishes/blocks.
 #   crew ls [--all]               List active crew tmux sessions / herdr workspaces.
 #   crew attach <branch>          Attach/switch to a crewmate's session/workspace.
-#   crew stop <branch> [-D]       Kill the session/workspace (-D also removes worktree + branch).
+#   crew stop <branch>           Stop the session and retain worktree and logs.
+#   crew cleanup <branch>        Remove a clean, integrated worker worktree and branch.
 #   crew help                     Show this help.
 #
 # crew is scoped per repository: sessions and state are namespaced by a repo key (stable
 # across the repo's worktrees), so ls/status/watch show only the current repo's crewmates.
-# Pass --all to span every repo. Headless crewmates commit on their own branch; they never
-# push. Review each ready branch (/review-diff) and ship it (/ship-gate).
+# Pass --all to span every repo. The orchestrator reviews work, stages commits, and integrates them before Gate.
 # Backend: herdr inside herdr, Rex inside Rex, otherwise tmux when available.
 # CREW_BACKEND=tmux|herdr|rex overrides detection. Also: git-wt + ai-branch-name (PATH), opencode/claude/codex/kimi/amp/commandcode. Run from inside
 # the target git repo.
@@ -94,12 +93,12 @@ crewmate_alive() {
 
 PREFIX="crew_"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/crew"
-TASK_SUFFIX="You are the worker assigned by the orchestrator. Complete this task yourself and report questions, blockers, and results to the orchestrator. Do not use sudo, rewrite history, access unrelated files or secrets, deploy, or perform other outward-facing actions. When done, commit your work on this branch with a Conventional-commit message. Do not push. If blocked, print BLOCKED: <reason> and stop."
+TASK_SUFFIX="You are the worker assigned by the orchestrator. Complete this task yourself and report questions, blockers, and results to the orchestrator. Do not use sudo, rewrite history, access unrelated files or secrets, deploy, or perform other outward-facing actions. When done, report the changed paths and verification to the orchestrator. Leave Git staging and commits to the orchestrator. Do not push. If blocked, print BLOCKED: <reason> and stop."
 KIMI_TASK_SUFFIX="Do not use sudo, rewrite Git history, delete the worktree, or perform any other destructive or outward-facing action."
 AMP_TASK_SUFFIX="$KIMI_TASK_SUFFIX"
 COMMANDCODE_TASK_SUFFIX="$KIMI_TASK_SUFFIX"
 ANTIGRAVITY_TASK_SUFFIX="$KIMI_TASK_SUFFIX"
-SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+SCRIPT_DIR=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
 AMP_CREW_SETTINGS="${CREW_AMP_SETTINGS:-$SCRIPT_DIR/../share/agentic/amp-settings.json}"
 OPENCODE_CREW_SETTINGS="${CREW_OPENCODE_SETTINGS:-$SCRIPT_DIR/../share/agentic/opencode-crew-settings.json}"
 AMP_GUARD_PLUGIN="$HOME/.config/amp/plugins/workflow-guardrails.ts"
@@ -109,23 +108,6 @@ COMMANDCODE_GUARD_HOOK="$HOME/.commandcode/hooks/crew-guard.sh"
 # nothing, so raise it well past any realistic task.
 ANTIGRAVITY_PRINT_TIMEOUT="${CREW_AGY_PRINT_TIMEOUT:-4h}"
 
-# Permission bypass applies to tasked workers. Interactive sessions use engine defaults.
-OPENCODE_CREW_FLAGS="--agent build --auto"
-CLAUDE_CREW_FLAGS="--dangerously-skip-permissions"
-CODEX_CREW_FLAGS="${CREW_CODEX_FLAGS:---dangerously-bypass-approvals-and-sandbox}"
-
-# A linked worktree keeps its git metadata in the MAIN repo at .git/worktrees/<name>,
-# which lies OUTSIDE the codex workspace-write sandbox. Without this, every codex
-# crewmate fails to commit with an index.lock permission error while looking like a
-# filesystem permissions problem. Resolved at run time, inside the worktree.
-CODEX_GIT_ADD_DIR='--add-dir "$(git rev-parse --git-common-dir 2>/dev/null || echo .git)"'
-
-# Toolchain caches live in $HOME, outside the workspace sandbox. Without write access a
-# crewmate cannot compile or resolve dependencies at all, and reports it as a permissions
-# error rather than a missing flag. Each entry is emitted only if the directory exists, so
-# this stays a no-op for languages the repo does not use.
-CODEX_CACHE_ADD_DIRS='$(for d in "$(go env GOCACHE 2>/dev/null)" "$(go env GOMODCACHE 2>/dev/null)" "$HOME/.cache/go-build" "$HOME/.npm" "$HOME/.cargo" "$HOME/.cache/uv"; do [ -n "$d" ] && [ -d "$d" ] && printf -- "--add-dir %s " "$d"; done)'
-
 codex_reasoning_flag() {
 	[ "$1" = fast ] || return 0
 	printf '%s' '-c model_reasoning_effort=low'
@@ -134,20 +116,20 @@ codex_reasoning_flag() {
 codex_headless_command() {
 	local model="$1" profile="$2" task="$3" reasoning
 	reasoning=$(codex_reasoning_flag "$profile")
-	printf 'codex exec --model %q %s %s %s %s %q' "$model" "$reasoning" "$CODEX_CREW_FLAGS" "$CODEX_GIT_ADD_DIR" "$CODEX_CACHE_ADD_DIRS" "$task"
+	printf 'codex -a never exec --sandbox workspace-write --model %q %s %q' "$model" "$reasoning" "$task"
 }
 
 codex_interactive_command() {
 	local model="$1" profile="$2" reasoning
 	reasoning=$(codex_reasoning_flag "$profile")
-	printf 'codex --model %q %s %s %s' "$model" "$reasoning" "$CODEX_GIT_ADD_DIR" "$CODEX_CACHE_ADD_DIRS"
+	printf 'codex --model %q %s' "$model" "$reasoning"
 }
 
 opencode_headless_command() {
 	local settings
 	settings=$(cat "$OPENCODE_CREW_SETTINGS") || die "could not read OpenCode Crew settings: $OPENCODE_CREW_SETTINGS"
-	printf 'CREW_MANAGED=1 OPENCODE_CONFIG_CONTENT=%q opencode run --model %q %q %s' \
-		"$settings" "$1" "$2" "$OPENCODE_CREW_FLAGS"
+	printf 'CREW_MANAGED=1 OPENCODE_CONFIG_CONTENT=%q opencode run --model %q %q --agent build' \
+		"$settings" "$1" "$2"
 }
 
 # Claude's default print format emits nothing until the whole run finishes. Consume its
@@ -187,8 +169,8 @@ claude_stream_filter() {
 }
 
 claude_headless_command() {
-	printf 'set -o pipefail; claude -p --model %q --output-format stream-json --verbose %q %s | jq --unbuffered -r %q' \
-		"$1" "$2" "$CLAUDE_CREW_FLAGS" "$CLAUDE_STREAM_FILTER"
+	printf 'set -o pipefail; claude -p --model %q --output-format stream-json --verbose %q | jq --unbuffered -r %q' \
+		"$1" "$2" "$CLAUDE_STREAM_FILTER"
 }
 
 task_with_guardrails() {
@@ -216,11 +198,8 @@ amp_interactive_command() {
 	fi
 }
 
-# CommandCode: -p headless writes require --yolo, so bound the run with CREW_MANAGED (the
-# guard hook denies push/sudo/hard-reset/clean/rm). Output is plain text - tee it as-is,
-# no stream filter needed. $1=model, $2=task.
 commandcode_headless_command() {
-	printf 'CREW_MANAGED=1 commandcode -p %q --model %q --yolo --skip-onboarding -t' "$2" "$1"
+	printf 'CREW_MANAGED=1 commandcode -p %q --model %q --skip-onboarding -t' "$2" "$1"
 }
 
 commandcode_interactive_command() {
@@ -230,7 +209,7 @@ commandcode_interactive_command() {
 antigravity_headless_command() {
 	local bin="agy"
 	command -v agy >/dev/null 2>&1 || bin="antigravity"
-	printf 'CREW_MANAGED=1 %s -p %q --model %q --print-timeout %q --dangerously-skip-permissions' \
+	printf 'CREW_MANAGED=1 %s -p %q --model %q --print-timeout %q' \
 		"$bin" "$2" "$1" "$ANTIGRAVITY_PRINT_TIMEOUT"
 }
 
@@ -262,7 +241,7 @@ require_amp_guard() {
 		|| die "Amp workflow guard plugin not found: $AMP_GUARD_PLUGIN (run: make restow-amp)"
 }
 
-# CommandCode crewmates run --yolo, so the deny-list guard hook is load-bearing: refuse
+# Require the CommandCode guard hook for delegated runs: refuse
 # to launch without it rather than run unbounded.
 require_commandcode_guard() {
 	[ -x "$COMMANDCODE_GUARD_HOOK" ] \
@@ -378,11 +357,12 @@ enter_crewmate() {
 worker_command() {
 	local full
 	full=$(task_with_guardrails "$engine" "$task")
+	printf 'export CREW_MANAGED=1; '
 	case "$engine" in
 		claude)   claude_headless_command "$model" "$full" ;;
 		codex)    codex_headless_command "$model" "$profile" "$full" ;;
 		opencode) opencode_headless_command "$model" "$full" ;;
-		kimi)     printf 'kimi --yolo --model %q -p %q' "$model" "$full" ;;
+		kimi)     printf 'kimi --model %q -p %q' "$model" "$full" ;;
 		amp)      amp_headless_command "$model" "$full" ;;
 		commandcode) commandcode_headless_command "$model" "$full" ;;
 		antigravity|agy) antigravity_headless_command "$model" "$full" ;;
@@ -451,11 +431,12 @@ herdr_spawn() {
 }
 
 cmd_new() {
-	local branch="" start="" task="" attach=0 engine="opencode" profile="standard"
+	local branch="" start="" task="" attach=0 resume=0 engine="opencode" profile="standard"
 	while [ $# -gt 0 ]; do
 		case "$1" in
 			-b|--branch) shift; branch="${1:-}" ;;
 			--attach) attach=1 ;;
+			--resume) resume=1 ;;
 			--claude) engine="claude" ;;
 			--codex) engine="codex" ;;
 			--kimi) engine="kimi" ;;
@@ -475,6 +456,9 @@ cmd_new() {
 	while [ $# -gt 0 ]; do task+="${task:+ }$1"; shift; done
 
 	git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "not inside a git repository"
+	[ -n "$branch" ] || die "assign a task branch with -b <branch> before dispatch"
+	resumable_branch "$branch"
+
 	require_engine_command "$engine"
 	[ "$engine" != claude ] || command -v jq >/dev/null 2>&1 || die "jq is required for Claude activity logs"
 	if [ "$profile" = auto ]; then
@@ -487,33 +471,34 @@ cmd_new() {
 	[ "$engine" != amp ] || require_amp_guard
 	[ "$engine" != commandcode ] || require_commandcode_guard
 
-	# Resolve the branch: explicit -b wins; otherwise AI-name it from the task.
-	if [ -z "$branch" ]; then
-		[ -n "$task" ] || die "usage: crew new [-b <branch>] <task...>"
-		branch=$(ai-branch-name --engine "$engine" "$task") || die "could not resolve a branch name"
-		printf '→ branch: %s\n' "$branch"
-	fi
 
-	# Create/attach the worktree via git-wt, then resolve its path. New worktrees start
-	# from the caller's current commit unless --start was supplied. Record that commit so
-	# status reports work produced by this crewmate, not unrelated divergence from main.
 	local backend
 	backend=$(detect_backend)
 	require_backend_tools "$backend"
 
 	local path base
 	if path=$(git wt path "$branch" 2>/dev/null); then
-		printf 'crew: reusing existing worktree %s\n' "$path"
-		base=$(git -C "$path" rev-parse HEAD) || die "could not resolve HEAD for $path"
+		if [ -n "$task" ] && [ "$resume" -ne 1 ]; then
+			die "worktree exists: inspect it and explicitly use --resume to continue"
+		fi
+		[ -z "$start" ] || die "--start is only supported for new branches"
+		base=$(git -C "$path" rev-parse HEAD)
 	else
-		base=$(git rev-parse "${start:-HEAD}^{commit}") \
+		[ "$resume" -eq 0 ] || die "no existing worktree to resume"
+		base=$(git rev-parse --verify --end-of-options "${start:-HEAD}^{commit}") \
 			|| die "could not resolve start point '${start:-HEAD}'"
-		git wt new "$branch" "$base" >/dev/null
+		if [ -n "$task" ]; then
+			git wt new "$branch" "$base" --no-setup >/dev/null
+		else
+			git wt new "$branch" "$base" >/dev/null
+		fi
 		path=$(git wt path "$branch")
+		base=$(git -C "$path" rev-parse HEAD)
 	fi
 
 	local name; name=$(session_name "$branch")
 	local sdir; sdir=$(state_dir_for "$branch")
+	check_state_branch "$sdir" "$branch"
 
 	local exists=0
 	crewmate_alive "$sdir" && exists=1
@@ -740,7 +725,7 @@ cmd_watch() {
 					done:0)
 						wt=$(cat "$d/worktree" 2>/dev/null || true)
 						ahead=$([ -d "$wt" ] && commits_ahead "$wt" "$d" || printf '?')
-						notify "crew: $branch ready for review" "done, $ahead commit(s) - /review-diff then /ship-gate" ;;
+						notify "crew: $branch ready for review" "review the worker diff and $ahead commit(s)" ;;
 					done:*)
 						notify "crew: $branch finished with errors ($key)" "check: crew logs $branch" ;;
 					int-idle)
@@ -801,20 +786,26 @@ cmd_attach() {
 	enter_crewmate "$sdir" "$name"
 }
 
+resumable_branch() {
+	git check-ref-format "refs/heads/$1" >/dev/null || die "invalid branch: $1"
+	"$SCRIPT_DIR/guard-default-branch" check-branch "$1" || die "protected branch: $1"
+}
+
+check_state_branch() {
+	local sdir="$1" branch="$2"
+	[ ! -f "$sdir/branch" ] || [ "$(cat "$sdir/branch")" = "$branch" ] \
+		|| die "Crew state name collides with another branch"
+}
+
 cmd_stop() {
-	local branch="" del=0
-	while [ $# -gt 0 ]; do
-		case "$1" in
-			-D) del=1 ;;
-			-*) die "unknown flag: $1" ;;
-			*) branch="$1" ;;
-		esac
-		shift
-	done
-	[ -n "$branch" ] || die "usage: crew stop <branch> [-D]"
+	[ "$#" -eq 1 ] || die "usage: crew stop <branch>; use crew cleanup separately"
+	local branch="$1"
+	resumable_branch "$branch"
+
 	local name sdir
 	name=$(session_name "$branch")
 	sdir=$(state_dir_for "$branch")
+	check_state_branch "$sdir" "$branch"
 
 	if [ "$(backend_for "$sdir")" = rex ]; then
 		if crewmate_alive "$sdir"; then
@@ -835,13 +826,20 @@ cmd_stop() {
 		printf 'crew: no session %s\n' "$name"
 	fi
 
-	rm -rf "$(state_dir_for "$branch")"
-
-	if [ "$del" -eq 1 ]; then
-		git wt rm "$branch" -D --force 2>/dev/null \
-			&& printf 'removed worktree + branch: %s\n' "$branch" \
-			|| printf 'crew: could not remove worktree for %s (remove manually)\n' "$branch" >&2
+	if [ -d "$sdir" ]; then
+		printf 'stopped\n' > "$sdir/status"
 	fi
+}
+
+cmd_cleanup() {
+	[ "$#" -eq 1 ] || die "usage: crew cleanup <worker-branch> (run from the integration branch)"
+	local branch="$1" sdir
+	resumable_branch "$branch"
+	sdir=$(state_dir_for "$branch")
+	[ -f "$sdir/branch" ] && [ "$(cat "$sdir/branch")" = "$branch" ] || die "no Crew record for $branch"
+	if crewmate_alive "$sdir"; then die "stop the worker before cleanup"; fi
+	git wt rm "$branch" -D
+	printf 'cleaned\n' > "$sdir/status"
 }
 
 cmd_help() { awk 'NR==1{next} /^#/{sub(/^#[ ]?/,""); print; next} {exit}' "$0"; }
@@ -856,6 +854,7 @@ main() {
 		ls|list)        cmd_ls "$@" ;;
 		attach)         cmd_attach "$@" ;;
 		stop|rm)        cmd_stop "$@" ;;
+		cleanup)        cmd_cleanup "$@" ;;
 		help|-h|--help) cmd_help ;;
 		*) die "unknown command: $sub (try: crew help)" ;;
 	esac

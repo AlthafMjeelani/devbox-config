@@ -17,8 +17,8 @@
 #   git wt list                           List worktrees for this repo
 #   git wt path <branch>                  Print the worktree path (for cd)
 #   git wt rm <branch> [-D] [--force]     Remove a worktree
-#                                           -D       also delete the branch
-#                                           --force  discard uncommitted work
+#                                           -D       also delete the branch if integrated
+#                                           --force  discard uncommitted work (worktree only)
 #   git wt prune                          Prune stale worktree metadata
 #   git wt help                           Show this help
 #
@@ -31,6 +31,8 @@
 # For `cd` into a worktree, use the `wt` shell function (see .aliasrc).
 
 set -euo pipefail
+
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 
 die() { printf 'git-wt: %s\n' "$*" >&2; exit 1; }
 
@@ -91,12 +93,12 @@ run_setup_hook() {
 	hook="$root/.worktrees-setup"
 	[ -e "$hook" ] || return 0
 	if [ ! -x "$hook" ]; then
-		printf 'git-wt: %s exists but is not executable; skipping (chmod +x it to enable)\n' "$hook" >&2
-		return 0
+		printf 'git-wt: %s exists but is not executable; setup blocked (chmod +x it or use --no-setup)\n' "$hook" >&2
+		return 1
 	fi
 	printf '\n→ running post-create hook: %s\n' "$hook"
 	( cd "$path" && GIT_WT_MAIN="$root" "$hook" "$branch" ) \
-		|| printf 'git-wt: post-create hook exited non-zero (worktree kept)\n' >&2
+		|| die "post-create hook failed; worktree kept at $path"
 }
 
 cmd_new() {
@@ -110,6 +112,7 @@ cmd_new() {
 		shift
 	done
 	[ -n "$branch" ] || die "usage: git wt new <branch> [<start-point>] [--no-setup]"
+	"$SCRIPT_DIR/guard-default-branch" check-branch "$branch" || die "protected branch: $branch"
 	local path; path=$(wt_path_for "$branch")
 
 	[ -e "$path" ] && die "worktree path already exists: $path"
@@ -121,11 +124,14 @@ cmd_new() {
 	else
 		# Create a new branch from start-point.
 		[ -n "$start" ] || start=$(default_start_point)
+		start=$(git rev-parse --verify --end-of-options "$start^{commit}") || die "invalid start point"
 		git worktree add -b "$branch" "$path" "$start"
 	fi
 	normalize_upstream "$branch"
 
-	[ "$run_setup" -eq 1 ] && run_setup_hook "$path" "$branch"
+	if [ "$run_setup" -eq 1 ]; then
+		run_setup_hook "$path" "$branch" || die "setup blocked; worktree kept at $path"
+	fi
 
 	printf '\n✔ worktree ready: %s\n' "$path"
 	printf '  cd %s\n' "$path"
@@ -139,7 +145,8 @@ cmd_list() {
 cmd_path() {
 	[ $# -ge 1 ] || die "usage: git wt path <branch>"
 	local path; path=$(wt_path_for "$1")
-	[ -d "$path" ] || die "no worktree for '$1' at $path"
+	[ -d "$path" ] && [ "$(git -C "$path" symbolic-ref --quiet HEAD)" = "refs/heads/$1" ] \
+		|| die "no matching worktree for '$1' at $path"
 	printf '%s\n' "$path"
 }
 
@@ -155,8 +162,16 @@ cmd_rm() {
 		shift
 	done
 	[ -n "$branch" ] || die "usage: git wt rm <branch> [-D] [--force]"
-	local path; path=$(wt_path_for "$branch")
-	[ -d "$path" ] || die "no worktree for '$branch' at $path"
+	"$SCRIPT_DIR/guard-default-branch" check-branch "$branch" || die "protected branch: $branch"
+	local path; path=$(cmd_path "$branch")
+	if [ "$del_branch" -eq 1 ]; then
+		[ "$force" -eq 0 ] || die "branch deletion cannot be combined with --force"
+		local integration
+		integration=$(git symbolic-ref --quiet HEAD) || die "check out the integration branch first"
+		[ "$integration" != "refs/heads/$branch" ] || die "run cleanup from the integration branch"
+		git merge-base --is-ancestor "refs/heads/$branch" "$integration" \
+			|| die "$branch has commits missing from $integration"
+	fi
 
 	if [ "$force" -eq 1 ]; then
 		git worktree remove --force "$path"
@@ -166,11 +181,7 @@ cmd_rm() {
 	printf '✔ removed worktree: %s\n' "$path"
 
 	if [ "$del_branch" -eq 1 ]; then
-		if [ "$force" -eq 1 ]; then
-			git branch -D "$branch" && printf '✔ deleted branch: %s\n' "$branch"
-		else
-			git branch -d "$branch" && printf '✔ deleted branch: %s\n' "$branch"
-		fi
+		git branch -d "$branch"
 	fi
 
 	# Tidy the base dir if now empty.

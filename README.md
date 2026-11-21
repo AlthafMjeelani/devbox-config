@@ -26,7 +26,7 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 | Also set up the zsh config | `./setup.sh --shell` |
 | See usage and quota for every agent | `ai-usage` (or the menu bar; on Linux `ai-usage-bar`) |
 | Pick models and save tokens | see [`docs/MODELS.md`](docs/MODELS.md); Codex: `codex -p fast|standard|deep` |
-| Run parallel agents in worktrees | `crew new "<task>" --claude` (see `agent-orchestration`) |
+| Run parallel agents in worktrees | `crew new -b agent/142-docs --claude "<task>"` (see `agent-orchestration`) |
 | Run and message agents in Rex | `rex-agents spawn <name> -C <dir> -- claude`, `rex-agents send <name> "..."` |
 | Check a project's env files and gitignore | `env-check` (add missing keys to `.env.example` with `env-check --sync`) |
 | Show model, branch, context and usage bars in Claude Code | `claude-statusline-install` (setup does this for you) |
@@ -80,16 +80,15 @@ If Rex says the CLI is not allowed, turn on Remote Control in Rex settings. `rex
 |---|---|---|
 | `agents/AGENTS.md` (this repo) | every agent, every project, via `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and the other links | the **coding workflow** (read the project's `AGENTS.md` first, always work on a feature branch), safety, commits, quality bar |
 | `AGENTS.md` in each project repo | that project only | stack, commands, conventions, folder map, branch and PR rules for the team |
-| `agents/.claude/settings.json`, `agents/.codex/rules/default.rules`, `amp/.config/amp/settings.json` | one tool | hard permissions: pushes to `dev`/`staging` are allowed and pushes to `main`/`master`/`develop`/`trunk` are denied in Claude Code, Codex, Amp and OpenCode; `make verify-agent-workflow` fails if that regresses |
+| `agents/.claude/settings.json`, `agents/.codex/rules/default.rules`, `amp/.config/amp/settings.json` | one tool | provider permissions for protected branch pushes |
 | `~/OPINIONS.md`, `~/VOICE.md` | your machine only | personal context agents read when deciding or writing as you; copy from `agents/OPINIONS.md.example` and `agents/VOICE.md.example` |
 
-**Enforced, not just asked.** `guard-default-branch` blocks work on `main`, `master`, `develop`, `trunk` and a repo's default branch in two places.
-`dev` and `staging` are never blocked, even as a repo's default branch: agents may commit and push on them directly.
+`guard-default-branch` protects `main`, `master`, `dev`, `develop`, `staging`, `trunk`, and the remote default branch. See the [orchestrator-first workflow](docs/ORCHESTRATOR-FIRST.md) for task branches, approval, and GitHub rules.
 
-- *Git*: a global `pre-commit` hook (`git/.config/git/hooks`) refuses commits on those branches for every agent and for you. Repo-local hooks still run through it.
+- *Git*: the global `pre-commit` and `pre-push` hooks (`git/.config/git/hooks`) check commits and actual remote refs. Repo-local hooks still run through it.
 - *Claude Code*: a `PreToolUse` hook blocks Edit and Write on those branches, with a message telling the agent to run `git switch -c feat/<topic>`. `./setup.sh` installs it into `~/.claude/settings.json` (a backup is kept); or run `guard-default-branch install-claude-hook`. A second `PreToolUse` hook on Bash blocks any `git push` that updates or deletes a protected branch (`HEAD:main`, `+x:main`, `--delete main`, `--all`, `git -C`, `cd ... &&`).
 
-Allow it deliberately: `ALLOW_DEFAULT_BRANCH=1 git commit ...` once, or `git config devbox.allowDefaultBranch true` for one repo. Do that in this dotfiles repo if you commit straight to `main` here. Repos that set their own `core.hooksPath` (husky) skip the git hook, but the Claude hook still applies.
+Allow it deliberately: `ALLOW_DEFAULT_BRANCH=1 git commit ...` once, or `git config devbox.allowDefaultBranch true` for one repo. GitHub rulesets enforce shared branch policy on the server. Repos that set their own `core.hooksPath` (husky) skip the git hook, but the Claude hook still applies.
 
 Edit `agents/AGENTS.md`, commit, and every agent picks it up on its next session. Keep it short, because it loads into every agent's context. Put project details in the project's own `AGENTS.md`, not here.
 

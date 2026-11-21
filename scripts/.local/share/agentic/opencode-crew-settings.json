@@ -1,7 +1,7 @@
 {
   "permission": {
     "bash": {
-      "*": "allow",
+      "*": "ask",
       "git push*": "deny",
       "git reset --hard*": "deny",
       "git clean -f*": "deny",
@@ -12,7 +12,7 @@
       ":(){*": "deny"
     },
     "edit": "allow",
-    "external_directory": "allow",
-    "webfetch": "allow"
+    "external_directory": "deny",
+    "webfetch": "ask"
   }
 }

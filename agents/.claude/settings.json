@@ -10,15 +10,19 @@
       "Bash(go test:*)",
       "Bash(pytest:*)",
       "Bash(php artisan test:*)",
-      "Bash(vendor/bin/phpunit:*)",
-      "Bash(git push origin dev)",
-      "Bash(git push -u origin dev)",
-      "Bash(git push --set-upstream origin dev)",
-      "Bash(git push origin staging)",
-      "Bash(git push -u origin staging)",
-      "Bash(git push --set-upstream origin staging)"
+      "Bash(vendor/bin/phpunit:*)"
     ],
     "deny": [
+      "Bash(git push origin dev)",
+      "Bash(git push -u origin dev)",
+      "Bash(git push -f origin dev)",
+      "Bash(git push --force origin dev)",
+      "Bash(git push origin HEAD:dev)",
+      "Bash(git push origin staging)",
+      "Bash(git push -u origin staging)",
+      "Bash(git push -f origin staging)",
+      "Bash(git push --force origin staging)",
+      "Bash(git push origin HEAD:staging)",
       "Bash(git push origin main)",
       "Bash(git push -u origin main)",
       "Bash(git push -f origin main)",
@@ -88,5 +92,39 @@
   "statusLine": {
     "type": "command",
     "command": "~/.local/bin/claude-statusline"
+  },
+  "agentPushNotifEnabled": true,
+  "autoMode": {
+    "environment": [
+      "### Org-wide",
+      "**Organization**: None configured",
+      "**Cloud provider(s)**: None configured",
+      "**Repository visibility**: private (texol-world-iCohort/entaura-mobile, confirmed via gh)",
+      "**Internal sharing / snippet hosting**: None configured — treat public paste/gist services as outside the trust boundary",
+      "**Secrets management**: None configured — project uses git-ignored .env / .env.prod files with a tracked .env.example placeholder",
+      "**Default / protected branches**: default branch is feat/initial-app; no protected branches listed and rulesets not queryable here — treat feat/initial-app as the protected default branch per repo convention (CLAUDE.md blocks edits/commits on the default branch)",
+      "**CI/CD deploy targets**: None configured",
+      "**Network posture**: None configured",
+      "**Host containment**: None configured — assume Claude Code runs on an ordinary developer machine with open internet",
+      "**Source control**: texol-world-iCohort/entaura-mobile (origin, https://github.com/texol-world-iCohort/entaura-mobile.git) only — no additional orgs configured",
+      "**Trusted internal domains**: None configured",
+      "**Trusted cloud buckets**: None configured",
+      "**Key internal services**: None configured",
+      "**Internal package registry**: None configured",
+      "**Sensitive data locations & audiences**: .env, .env.prod, android/key.properties, android/entaura.jks (release signing keystore and passwords) — keep out of version control and share only with developers authorized for release signing",
+      "**Data retention / declassification**: None configured",
+      "**Sensitive remote targets**: production release artifacts built via tool/build.sh with .env.prod (API_BASE_URL pointing at a production server) — treat as sensitive; no host/namespace in this repo literally contains 'prod' as a segment besides this build-config convention",
+      "**Protected deployment namespaces / environments**: None configured — fall back to the Sensitive remote targets heuristic",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries 'prod' or 'production' as a whole word or name segment",
+      "### User-specific",
+      "**Primary use of Claude Code**: software development (Flutter mobile app, entaura-mobile)",
+      "**Trusted repo**: /Volumes/PortableSSD/dev/texol/entaura/entaura-mobile and its origin remote (texol-world-iCohort/entaura-mobile, private)",
+      "**Org-specific CLIs**: fvm (Flutter Version Management, used for all flutter commands in this repo)"
+    ],
+    "soft_deny": [
+      "$defaults",
+      "Bash(tool/build.sh:appbundle .env.prod)",
+      "Bash(keytool:-genkeypair*)"
+    ]
   }
 }
