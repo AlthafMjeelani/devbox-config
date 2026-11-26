@@ -26,7 +26,7 @@ Resolve routine dispatch decisions yourself and bring the user decisions that re
 8. **Clean up** when authorized. Keep worker sessions available while the user wants to inspect output.
 
 ## Delegating directly to Codex or Claude
-Stay the orchestrator and launch the named engine headlessly.
+Stay the captain and launch the named engine headlessly.
 Use standard provider permissions and give the worker a brief with scope, checks, and a report destination.
 
 1. **Prepare**: for code changes, give the named worker its own worktree and branch (`git worktree add ../<repo>-<topic> -b <type>/<topic>`).
@@ -71,10 +71,10 @@ Use standard provider permissions and give the worker a brief with scope, checks
    Read Codex's final message from `result.md` or Claude's result event from the stream log.
    If progress stalls, inspect the terminal and resolve or surface the blocker.
 5. **Review**: open the produced files (look at images, read the diff, run the tests).
-6. **Integrate**: apply or adapt the result in the main work, verify it end to end, then report what the worker produced and what you changed.
+6. **Hand off**: the worker commits on its own branch and never pushes. Do not apply its result into the main work yourself; report what it produced and the branch name, and the user reviews and ships it. For one-off outputs outside Git (images, research, drafts), hand over the files.
 7. **Clean up**: remove worktrees you created once their branch is merged or abandoned.
 
-The brief reserves push, deployment, history rewrites, destructive actions, and access to secrets for the orchestrator.
+The brief reserves push, deployment, history rewrites, destructive actions, and access to secrets for the user.
 Permission bypass gives the worker the process account’s access. Use OS-level isolation when that access must be constrained.
 
 ## Task brief template
@@ -84,6 +84,7 @@ Context: <files/modules involved, links>
 Do: <steps or constraints>
 Do not: push, force-push, rewrite history, touch files outside <paths>, use sudo
 Done when: <tests pass / command output / file exists>
+Commit: commit your work on this branch with a Conventional-commit message
 Report: write REPORT.md with what changed, what you verified, open questions
 ```
 
