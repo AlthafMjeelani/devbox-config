@@ -24,6 +24,8 @@ Then restart your terminal and your agents, and ask one of them: "list your skil
 | Install only some parts | `make stow PKG="agents opencode nvim"` |
 | Remove a part | `make unstow PKG="nvim"` |
 | Also set up the zsh config | `./setup.sh --shell` |
+| Set model names per agent and tier (kept local, never committed) | `agent-model --init`, then edit `~/.config/agents/tiers.json`; `agent-model --check` shows gaps |
+| Run a task on the right model and effort | `agent-route <fast\|standard\|deep> "<task>"` (engines: claude, codex, opencode, pi) |
 | See usage and quota for every agent | `ai-usage` (or the menu bar; on Linux `ai-usage-bar`) |
 | Pick models and save tokens | see [`docs/MODELS.md`](docs/MODELS.md); Codex: `codex -p fast|standard|deep` |
 | Run parallel agents in worktrees | `crew new -b agent/142-docs --claude "<task>"` (see `agent-orchestration`) |
