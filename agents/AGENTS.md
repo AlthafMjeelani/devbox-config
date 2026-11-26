@@ -18,11 +18,7 @@ Project-specific rules live in each repo's own `AGENTS.md`.
 Before changing any code:
 1. Read the repo's own instructions first: `AGENTS.md` (or `CLAUDE.md`) at the repo root and in the folder you will touch, then `README` / `CONTRIBUTING` for commands.
    Follow them over these defaults. If none exist, say so and infer commands from `package.json`, `Makefile`, `pubspec.yaml`, `go.mod` and similar.
-2. Check `git status` and the current branch.
-   Treat `main`, `master`, `dev`, `develop`, `staging`, `trunk`, and the default branch as protected. Create or switch to a task branch first.
-   Name it by intent: `feat/<topic>`, `fix/<topic>`, `chore/<topic>`, `docs/<topic>`, `refactor/<topic>`.
-   If the current branch holds unrelated work, start a new branch from the default branch (or ask).
-   If there are uncommitted changes you did not make, stop and surface them.
+2. Check `git status` and the current branch. Branch first if on the default branch.
 3. State the scope in one line. Plan first when the change is non-trivial.
 
 While coding:
@@ -34,9 +30,7 @@ Before finishing:
 - Run the `verify-task` skill and base your report on its output.
 - Review your own `git diff` and remove stray edits.
 - Report what changed, what you verified (with command output) and what you did not.
-- Leave the work committed on the feature branch only if asked. Do not push, merge or open a PR unless asked.
-- For parallel agents, give each its own worktree and branch (`git-wt`, `crew`).
-- This is enforced: commits and (in Claude Code) edits on the protected branches and pushes to those branches, are blocked with a message. If you see "Blocked: you are on 'main'", run `git switch -c feat/<topic>` and continue. Do not bypass it with `ALLOW_DEFAULT_BRANCH` unless the user says to.
+- Commit or push only if asked. Do not merge or open a PR unless asked.
 
 ## Missing skills
 - If no skill fits the task, finish the work anyway, then follow `missing-skill-handling` to find, extend or propose a new skill. Do not commit or push it without asking.
@@ -52,16 +46,13 @@ Before finishing:
 
 ## Safety
 - Confirm before hard-to-reverse or outward-facing actions (push, deploy, delete, send).
-- Use pull requests for changes targeting protected branches. Never auto-merge or enable yolo / skip-permission modes on your own.
+- Never auto-push, auto-merge, or enable yolo / skip-permission modes on your own.
 - Before deleting or overwriting, look at the target; if it contradicts expectations, stop and surface it.
 
 ## Commits
 - Conventional-commit style subjects (`feat:`, `fix:`, `chore:` ...).
-- Commit only when asked. All work happens on a feature branch (see Coding workflow), away from protected branches.
-- Only the orchestrator may push the integration branch or open a draft PR, with explicit authorization.
+- Commit or push only when asked. Branch first if on the default branch.
 - Never auto-add the agent name as a co-author or `Co-Authored-By` trailer.
-- Merging (only when asked) always means rebase onto the default branch, then fast-forward; never a merge commit.
-  After it succeeds, delete the finished branch with `branch-cleanup`.
 
 ## Quality bar
 - No half-done work. If tests fail or a step is skipped, say so plainly with the output.
@@ -123,7 +114,7 @@ Postman CLI is installed on this device, and can be used for API Engineering wor
   Crew selects the matching terminal backend automatically.
 - Assign a task ID and file ownership before dispatch. Use separate worktrees only for parallel changes.
   Use provider permissions and scoped credentials for direct and Crew workers.
-  Workers report their changes, checks, and blockers. The orchestrator owns Git staging, integration and publishing.
+  Workers report their changes, checks, and blockers.
 - Bring the user decisions that require their authority.
   Resolve routine worker questions within the agreed scope.
 - Pick the model and effort per task with `agent-route "<task>" --files N` (see `model-routing`). Default low; escalate only when it says so.

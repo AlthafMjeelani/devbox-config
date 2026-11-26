@@ -37,4 +37,4 @@ The Vercel MCP server (`https://mcp.vercel.com`, OAuth) covers deployments, logs
 - Claude Code: `claude mcp add --scope user --transport http vercel https://mcp.vercel.com`, then `/mcp` to sign in.
 - Codex: `codex mcp login vercel`. OpenCode: `opencode mcp auth vercel`.
 
-Related skills: `aws-deploy`, `env-and-secrets`, `ship-gate`, `branch-cleanup`.
+Related skills: `aws-deploy`, `env-and-secrets`, `ship-gate`.
