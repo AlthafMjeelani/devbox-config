@@ -14,7 +14,7 @@ describe("agent policy files", () => {
     expect(s.permissions.allow).not.toContain("Bash(git push origin dev)");
     expect(s.permissions.deny).toContain("Bash(git push origin staging)");
     expect(s.permissions.allow).not.toContain("Bash(git push origin staging)");
-    expect(JSON.stringify(s.hooks)).toContain("guard-default-branch claude-hook");
+    expect(JSON.stringify(s.hooks)).not.toContain("guard-default-branch claude-hook");
     expect(JSON.stringify(s.hooks)).toContain("guard-default-branch claude-push-hook");
     expect(s.statusLine.command).toBe("~/.local/bin/claude-statusline");
   });

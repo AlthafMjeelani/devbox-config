@@ -49,7 +49,6 @@ try {
   const claude = JSON.parse(readFileSync(join(repo, "agents/.claude/settings.json"), "utf8"));
   if (!claude.permissions?.deny?.includes("Bash(git push origin main)")) failure("agents/.claude/settings.json must deny pushing main");
   if (!JSON.stringify(claude.hooks ?? {}).includes("guard-default-branch claude-push-hook")) failure("agents/.claude/settings.json is missing the push guard hook");
-  if (!JSON.stringify(claude.hooks ?? {}).includes("guard-default-branch")) failure("agents/.claude/settings.json is missing the guard-default-branch hook");
 } catch (error) {
   failure(`agents/.claude/settings.json missing or invalid: ${error}`);
 }

@@ -57,16 +57,6 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.local/bin/guard-default-branch claude-hook",
-            "timeout": 10
-          }
-        ]
-      },
-      {
         "matcher": "Bash",
         "hooks": [
           {
@@ -100,21 +90,21 @@
       "**Organization**: None configured",
       "**Cloud provider(s)**: None configured",
       "**Repository visibility**: private (texol-world-iCohort/entaura-mobile, confirmed via gh)",
-      "**Internal sharing / snippet hosting**: None configured — treat public paste/gist services as outside the trust boundary",
-      "**Secrets management**: None configured — project uses git-ignored .env / .env.prod files with a tracked .env.example placeholder",
-      "**Default / protected branches**: default branch is feat/initial-app; no protected branches listed and rulesets not queryable here — treat feat/initial-app as the protected default branch per repo convention (CLAUDE.md blocks edits/commits on the default branch)",
+      "**Internal sharing / snippet hosting**: None configured \u2014 treat public paste/gist services as outside the trust boundary",
+      "**Secrets management**: None configured \u2014 project uses git-ignored .env / .env.prod files with a tracked .env.example placeholder",
+      "**Default / protected branches**: default branch is feat/initial-app; no protected branches listed and rulesets not queryable here \u2014 treat feat/initial-app as the protected default branch per repo convention (CLAUDE.md blocks edits/commits on the default branch)",
       "**CI/CD deploy targets**: None configured",
       "**Network posture**: None configured",
-      "**Host containment**: None configured — assume Claude Code runs on an ordinary developer machine with open internet",
-      "**Source control**: texol-world-iCohort/entaura-mobile (origin, https://github.com/texol-world-iCohort/entaura-mobile.git) only — no additional orgs configured",
+      "**Host containment**: None configured \u2014 assume Claude Code runs on an ordinary developer machine with open internet",
+      "**Source control**: texol-world-iCohort/entaura-mobile (origin, https://github.com/texol-world-iCohort/entaura-mobile.git) only \u2014 no additional orgs configured",
       "**Trusted internal domains**: None configured",
       "**Trusted cloud buckets**: None configured",
       "**Key internal services**: None configured",
       "**Internal package registry**: None configured",
-      "**Sensitive data locations & audiences**: .env, .env.prod, android/key.properties, android/entaura.jks (release signing keystore and passwords) — keep out of version control and share only with developers authorized for release signing",
+      "**Sensitive data locations & audiences**: .env, .env.prod, android/key.properties, android/entaura.jks (release signing keystore and passwords) \u2014 keep out of version control and share only with developers authorized for release signing",
       "**Data retention / declassification**: None configured",
-      "**Sensitive remote targets**: production release artifacts built via tool/build.sh with .env.prod (API_BASE_URL pointing at a production server) — treat as sensitive; no host/namespace in this repo literally contains 'prod' as a segment besides this build-config convention",
-      "**Protected deployment namespaces / environments**: None configured — fall back to the Sensitive remote targets heuristic",
+      "**Sensitive remote targets**: production release artifacts built via tool/build.sh with .env.prod (API_BASE_URL pointing at a production server) \u2014 treat as sensitive; no host/namespace in this repo literally contains 'prod' as a segment besides this build-config convention",
+      "**Protected deployment namespaces / environments**: None configured \u2014 fall back to the Sensitive remote targets heuristic",
       "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries 'prod' or 'production' as a whole word or name segment",
       "### User-specific",
       "**Primary use of Claude Code**: software development (Flutter mobile app, entaura-mobile)",

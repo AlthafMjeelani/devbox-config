@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Global git hook runner. Every hook name below is a symlink to this file.
-# 1) pre-commit refuses commits on main/master/develop (see guard-default-branch),
-#    then scans the staged diff for secrets with gitleaks when it is installed.
+# 1) pre-commit scans the staged diff for secrets with gitleaks when it is installed.
 # 2) commit-msg requires a Conventional Commits subject (feat:, fix(scope):, chore!: ...).
 #    Merge, revert, fixup! and squash! messages pass. Per repo opt-out: git config devbox.allowAnyCommitMessage true
 # 3) Then it runs the repo's own hook from .git/hooks, because a global core.hooksPath would otherwise hide it.
@@ -25,9 +24,6 @@ if [ "$hook" = pre-push ]; then
 fi
 
 if [ "$hook" = pre-commit ]; then
-  guard="$(command -v guard-default-branch 2>/dev/null || true)"
-  [ -n "$guard" ] || guard="$HOME/.local/bin/guard-default-branch"
-  if [ -x "$guard" ]; then "$guard" check . || exit 1; fi
   if command -v gitleaks >/dev/null 2>&1; then
     if ! gitleaks git --pre-commit --staged --redact --no-banner --log-level warn .; then
       echo "Blocked: gitleaks found a possible secret in the staged changes. Remove it, or mark a false positive with a 'gitleaks:allow' comment." >&2

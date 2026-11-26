@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# guard-default-branch - keep coding agents (and commits) off main/master/develop.
+# guard-default-branch - block direct pushes (including force pushes) to protected branches.
+# Editing and committing on any branch is never blocked; only pushes are guarded.
 #
-#   guard-default-branch check [dir]          Exit 1 with a message if dir is on a protected branch.
-#   guard-default-branch claude-hook          Claude Code PreToolUse hook: reads the tool call JSON on stdin,
-#                                             exits 2 (block) when the file being edited is on a protected branch.
+#   guard-default-branch check-branch <name>  Exit 1 if <name> is a protected branch.
 #   guard-default-branch claude-push-hook     Claude Code PreToolUse hook for Bash: exits 2 (block) when a git push
 #                                             targets (or deletes) a protected branch.
-#   guard-default-branch install-claude-hook  Merge that hook into ~/.claude/settings.json (idempotent, keeps a backup).
+#   guard-default-branch install-claude-hook  Merge the push hook into ~/.claude/settings.json (idempotent, keeps a backup).
 #
 # Protected: main, master, develop, trunk, and the repo's own default branch (origin/HEAD).
 # Dev and staging are also protected. pre-push checks the actual remote refs.
@@ -26,32 +25,6 @@ allowed() {
   [ "$(git -C "$1" config --get devbox.allowDefaultBranch 2>/dev/null || true)" = true ]
 }
 
-check() {
-  local dir="${1:-.}" branch
-  git -C "$dir" rev-parse --show-toplevel >/dev/null 2>&1 || return 0   # not a git repo
-  branch="$(git -C "$dir" symbolic-ref --short -q HEAD 2>/dev/null || true)"
-  [ -n "$branch" ] || return 0                                           # detached HEAD (rebase, checkout of a tag)
-  protected "$branch" "$dir" || return 0
-  allowed "$dir" && return 0
-  cat >&2 <<MSG
-Blocked: you are on '$branch', a protected branch. Work on a feature branch instead:
-  git switch -c feat/<short-topic>      (or fix/, chore/, docs/, refactor/)
-One-off override: ALLOW_DEFAULT_BRANCH=1.  Per repo: git config devbox.allowDefaultBranch true
-MSG
-  return 1
-}
-
-claude_hook() {
-  command -v jq >/dev/null 2>&1 || exit 0
-  local input path dir
-  input="$(cat)"
-  path="$(printf '%s' "$input" | jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' 2>/dev/null || true)"
-  [ -n "$path" ] || exit 0
-  dir="$(dirname "$path")"
-  while [ ! -d "$dir" ] && [ "$dir" != "/" ]; do dir="$(dirname "$dir")"; done   # new files in new folders
-  check "$dir" || exit 2
-}
-
 # Print the branches a `git push` argument list would update or delete, one per line ("*" for --all/--mirror).
 push_targets() {
   local dir="$1"; shift
@@ -68,9 +41,12 @@ push_targets() {
   if [ "${#positional[@]}" -le 1 ]; then   # no refspec: push.default pushes the current branch (or its upstream)
     current="$(git -C "$dir" symbolic-ref --short -q HEAD 2>/dev/null || true)"
     [ -n "$current" ] || return 0
-    upstream="$(git -C "$dir" config --get "branch.$current.merge" 2>/dev/null || true)"
     echo "$current"
-    [ -z "$upstream" ] || echo "${upstream#refs/heads/}"
+    case "$(git -C "$dir" config --get push.default 2>/dev/null || true)" in
+      upstream|tracking)   # only here does a bare push go to the upstream name
+        upstream="$(git -C "$dir" config --get "branch.$current.merge" 2>/dev/null || true)"
+        [ -z "$upstream" ] || echo "${upstream#refs/heads/}" ;;
+    esac
     return 0
   fi
   for arg in "${positional[@]:1}"; do
@@ -142,7 +118,7 @@ install_claude_hook() {
   mkdir -p "$HOME/.claude"
   [ -e "$file" ] || echo '{}' > "$file"
   real="$(readlink -f "$file")"
-  if jq -e '[.hooks.PreToolUse[]?.hooks[]?.command] | (any(test("guard-default-branch claude-hook")) and any(test("guard-default-branch claude-push-hook")))' "$real" >/dev/null 2>&1; then
+  if jq -e '[.hooks.PreToolUse[]?.hooks[]?.command] | any(test("guard-default-branch claude-push-hook"))' "$real" >/dev/null 2>&1; then
     echo "Claude hooks already installed."; return 0
   fi
   cp "$real" "$real.bak-guard"
@@ -151,8 +127,7 @@ install_claude_hook() {
     def add($matcher; $cmd):
       if ([.hooks.PreToolUse[]?.hooks[]?.command] | any(. == $cmd)) then .
       else .hooks.PreToolUse = ((.hooks.PreToolUse // []) + [{"matcher":$matcher,"hooks":[{"type":"command","command":$cmd,"timeout":10}]}]) end;
-    add("Edit|Write|MultiEdit|NotebookEdit"; "~/.local/bin/guard-default-branch claude-hook")
-    | add("Bash"; "~/.local/bin/guard-default-branch claude-push-hook")' "$real" > "$tmp"
+    add("Bash"; "~/.local/bin/guard-default-branch claude-push-hook")' "$real" > "$tmp"
   cat "$tmp" > "$real"; rm -f "$tmp"
   echo "Installed the Claude Code hooks (backup: $real.bak-guard)."
 }
@@ -178,8 +153,6 @@ case "${1:-}" in
       esac
     done
     ;;
-  check) shift; check "${1:-.}" ;;
-  claude-hook) claude_hook ;;
   claude-push-hook) claude_push_hook ;;
   install-claude-hook) install_claude_hook ;;
   -h|--help|help|"") sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//' ;;

@@ -20,35 +20,11 @@ function newRepo(branch: string) {
   return dir;
 }
 
-describe("guard-default-branch check", () => {
-  test("blocks main, master and develop, allows feature branches", () => {
-    for (const b of ["main", "master", "develop"]) expect(sh(`${guard} check .`, newRepo(b)).code).toBe(1);
-    expect(sh(`${guard} check .`, newRepo("feat/x")).code).toBe(0);
-  });
-  test("message tells the agent what to do", () => {
-    expect(sh(`${guard} check .`, newRepo("main")).err).toContain("git switch -c feat/");
-  });
-  test("overrides: env var and per-repo config", () => {
-    const dir = newRepo("main");
-    expect(sh(`ALLOW_DEFAULT_BRANCH=1 ${guard} check .`, dir).code).toBe(0);
-    sh("git config devbox.allowDefaultBranch true", dir);
-    expect(sh(`${guard} check .`, dir).code).toBe(0);
-  });
-  test("non-repos and detached HEAD are allowed", () => {
-    expect(sh(`${guard} check .`, mkdtempSync(resolve(root, "plain-"))).code).toBe(0);
-    const dir = newRepo("main");
-    sh("git checkout -q --detach", dir);
-    expect(sh(`${guard} check .`, dir).code).toBe(0);
-  });
-});
-
-describe("shared branch protection", () => {
-  test("check blocks dev and staging, even as the repo's default branch", () => {
-    for (const b of ["dev", "staging"]) {
-      const dir = newRepo(b);
-      sh(`git remote add origin https://example.invalid/r.git && git update-ref refs/remotes/origin/${b} HEAD && git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/${b}`, dir);
-      expect(sh(`${guard} check .`, dir).code).toBe(1);
-    }
+describe("check-branch", () => {
+  test("rejects protected names, accepts feature names", () => {
+    const dir = newRepo("feat/x");
+    for (const b of ["main", "master", "develop", "dev", "staging", "trunk"]) expect(sh(`${guard} check-branch ${b}`, dir).code).toBe(1);
+    expect(sh(`${guard} check-branch feat/x`, dir).code).toBe(0);
   });
 });
 
@@ -81,6 +57,15 @@ describe("claude-push-hook", () => {
     }
     expect(push(dir, "git push origin main").err).toContain("protected branch");
   });
+  test("a bare push from a feature branch tracking main is allowed, force-with-lease included", () => {
+    const dir = newRepo("main");
+    sh("git switch -q -c feat/x && git config branch.feat/x.remote origin && git config branch.feat/x.merge refs/heads/main", dir);
+    for (const c of ["git push", "git push --force-with-lease", "git push -f"]) expect([c, push(dir, c).code]).toEqual([c, 0]);
+  });
+  test("force pushes to protected branches stay blocked", () => {
+    const dir = newRepo("feat/x");
+    for (const c of ["git push --force origin main", "git push -f origin HEAD:main", "git push origin +feat/x:main"]) expect([c, push(dir, c).code]).toEqual([c, 2]);
+  });
   test("a bare push from a protected branch is blocked", () => {
     expect(push(newRepo("main"), "git push").code).toBe(2);
   });
@@ -88,20 +73,6 @@ describe("claude-push-hook", () => {
     const dir = newRepo("main");
     sh("git config devbox.allowDefaultBranch true", dir);
     expect(push(dir, "git push origin main").code).toBe(0);
-  });
-});
-
-describe("claude-hook", () => {
-  const call = (dir: string, file: string) => sh(`${guard} claude-hook`, dir, {}, JSON.stringify({ tool_input: { file_path: file } }));
-  test("blocks edits on main with exit 2, including new files in new folders", () => {
-    const dir = newRepo("main");
-    expect(call(dir, resolve(dir, "a.ts")).code).toBe(2);
-    expect(call(dir, resolve(dir, "new/deeper/a.ts")).code).toBe(2);
-  });
-  test("allows edits on a feature branch, outside repos, and tool calls without a path", () => {
-    expect(call(newRepo("feat/x"), "a.ts").code).toBe(0);
-    expect(call(mkdtempSync(resolve(root, "p-")), "/tmp/whatever.txt").code).toBe(0);
-    expect(sh(`${guard} claude-hook`, root, {}, JSON.stringify({ tool_input: { command: "ls" } })).code).toBe(0);
   });
 });
 
@@ -114,11 +85,11 @@ describe("git hooks", () => {
     sh(`git config core.hooksPath ${hooks}`, dir);
     return { dir, env: { PATH: `${bin}:${process.env.PATH}` } };
   }
-  test("pre-commit refuses commits on main and allows them on a feature branch", () => {
-    const main = withHooks("main");
-    expect(sh("git commit -q --allow-empty -m x", main.dir, main.env).code).not.toBe(0);
-    const feat = withHooks("feat/y");
-    expect(sh('git commit -q --allow-empty -m "chore: x"', feat.dir, feat.env).code).toBe(0);
+  test("commits are allowed on any branch, including main", () => {
+    for (const b of ["main", "feat/y"]) {
+      const { dir, env } = withHooks(b);
+      expect(sh('git commit -q --allow-empty -m "chore: x"', dir, env).code).toBe(0);
+    }
   });
   test("a repo's own hook still runs through the global runner", () => {
     const { dir, env } = withHooks("feat/z");
@@ -159,9 +130,8 @@ describe("install-claude-hook", () => {
     const s = JSON.parse(readFileSync(file, "utf8"));
     expect(s.theme).toBe("dark");
     expect(s.hooks.Stop).toHaveLength(1);
-    expect(s.hooks.PreToolUse).toHaveLength(2);
-    expect(s.hooks.PreToolUse[0].matcher).toContain("Edit");
-    expect(s.hooks.PreToolUse[1].matcher).toBe("Bash");
-    expect(s.hooks.PreToolUse[1].hooks[0].command).toContain("claude-push-hook");
+    expect(s.hooks.PreToolUse).toHaveLength(1);
+    expect(s.hooks.PreToolUse[0].matcher).toBe("Bash");
+    expect(s.hooks.PreToolUse[0].hooks[0].command).toContain("claude-push-hook");
   });
 });

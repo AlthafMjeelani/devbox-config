@@ -18,7 +18,7 @@ Project-specific rules live in each repo's own `AGENTS.md`.
 Before changing any code:
 1. Read the repo's own instructions first: `AGENTS.md` (or `CLAUDE.md`) at the repo root and in the folder you will touch, then `README` / `CONTRIBUTING` for commands.
    Follow them over these defaults. If none exist, say so and infer commands from `package.json`, `Makefile`, `pubspec.yaml`, `go.mod` and similar.
-2. Check `git status` and the current branch. Branch first if on the default branch.
+2. Check `git status` and the current branch. Work on the current branch. Do not create a new branch or PR for each change; create one only when the user asks.
 3. State the scope in one line. Plan first when the change is non-trivial.
 
 While coding:
@@ -30,7 +30,8 @@ Before finishing:
 - Run the `verify-task` skill and base your report on its output.
 - Review your own `git diff` and remove stray edits.
 - Report what changed, what you verified (with command output) and what you did not.
-- Commit or push only if asked. Do not merge or open a PR unless asked.
+- Commit or push only if asked. Do not open a PR unless asked.
+- Never push directly or force-push to `main`, `master`, `dev`, `develop`, `staging` or `trunk`; this is blocked. Feature branches may be pushed, and force-pushed with `--force-with-lease` after a rebase.
 
 ## Missing skills
 - If no skill fits the task, finish the work anyway, then follow `missing-skill-handling` to find, extend or propose a new skill. Do not commit or push it without asking.
@@ -46,12 +47,12 @@ Before finishing:
 
 ## Safety
 - Confirm before hard-to-reverse or outward-facing actions (push, deploy, delete, send).
-- Never auto-push, auto-merge, or enable yolo / skip-permission modes on your own.
+- Never auto-merge or enable yolo / skip-permission modes on your own.
 - Before deleting or overwriting, look at the target; if it contradicts expectations, stop and surface it.
 
 ## Commits
 - Conventional-commit style subjects (`feat:`, `fix:`, `chore:` ...).
-- Commit or push only when asked. Branch first if on the default branch.
+- Commit or push only when asked. Stay on the current branch; do not create new branches or PRs unless asked.
 - Never auto-add the agent name as a co-author or `Co-Authored-By` trailer.
 
 ## Quality bar

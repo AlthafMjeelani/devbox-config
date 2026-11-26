@@ -141,14 +141,14 @@ run ./scripts/.local/bin/agents-sync --force   # --force: replace stale links fr
 run make stow PKG="$PKGS"
 [ "$DRY" = 0 ] && ok "Linked: $PKGS"
 
-# ---- 3a. Branch guard (agents stay on feature branches) --------------------------------------
-step "3a Branch guard"
+# ---- 3a. Branch guard (no direct or force pushes to protected branches) --------------------------------------
+step "3a Push guard"
 if have jq && { [ -d "$HOME/.claude" ] || have claude; }; then
   run "$REPO/scripts/.local/bin/guard-default-branch" install-claude-hook
 else
   ok "Claude Code not found (hook installs with: guard-default-branch install-claude-hook)"
 fi
-ok "Git hooks block commits on main/master/develop. Override: ALLOW_DEFAULT_BRANCH=1 or git config devbox.allowDefaultBranch true"
+ok "Git hooks block pushes to main/master/develop. Override: ALLOW_DEFAULT_BRANCH=1 or git config devbox.allowDefaultBranch true"
 
 # ---- 3a2. Claude Code status line (model, branch, context, 5h and 7d usage bars) ---------------
 if have jq && { [ -d "$HOME/.claude" ] || have claude; }; then

@@ -83,12 +83,14 @@ If Rex says the CLI is not allowed, turn on Remote Control in Rex settings. `rex
 | `agents/.claude/settings.json`, `agents/.codex/rules/default.rules`, `amp/.config/amp/settings.json` | one tool | provider permissions for protected branch pushes |
 | `~/OPINIONS.md`, `~/VOICE.md` | your machine only | personal context agents read when deciding or writing as you; copy from `agents/OPINIONS.md.example` and `agents/VOICE.md.example` |
 
-`guard-default-branch` protects `main`, `master`, `dev`, `develop`, `staging`, `trunk`, and the remote default branch. See the [orchestrator-first workflow](docs/ORCHESTRATOR-FIRST.md) for task branches, approval, and GitHub rules.
+`guard-default-branch` blocks direct pushes and force pushes to `main`, `master`, `dev`, `develop`, `staging`, `trunk`, and the remote default branch. Editing and committing are never blocked, and feature branches can be pushed and force-pushed with `--force-with-lease`. See the [orchestrator-first workflow](docs/ORCHESTRATOR-FIRST.md) for task branches, approval, and GitHub rules.
 
-- *Git*: the global `pre-commit` and `pre-push` hooks (`git/.config/git/hooks`) check commits and actual remote refs. Repo-local hooks still run through it.
-- *Claude Code*: a `PreToolUse` hook blocks Edit and Write on those branches, with a message telling the agent to run `git switch -c feat/<topic>`. `./setup.sh` installs it into `~/.claude/settings.json` (a backup is kept); or run `guard-default-branch install-claude-hook`. A second `PreToolUse` hook on Bash blocks any `git push` that updates or deletes a protected branch (`HEAD:main`, `+x:main`, `--delete main`, `--all`, `git -C`, `cd ... &&`).
+- *Git*: the global `pre-push` hook (`git/.config/git/hooks`) checks the actual remote refs; `pre-commit` only scans for secrets. Repo-local hooks still run through it.
+- *Claude Code*: a `PreToolUse` hook on Bash blocks any `git push` that updates or deletes a protected branch (`HEAD:main`, `+x:main`, `--delete main`, `--all`, `git -C`, `cd ... &&`).
 
-Allow it deliberately: `ALLOW_DEFAULT_BRANCH=1 git commit ...` once, or `git config devbox.allowDefaultBranch true` for one repo. GitHub rulesets enforce shared branch policy on the server. Repos that set their own `core.hooksPath` (husky) skip the git hook, but the Claude hook still applies.
+`./setup.sh` installs it into `~/.claude/settings.json` (a backup is kept); or run `guard-default-branch install-claude-hook`.
+
+Allow it deliberately: `ALLOW_DEFAULT_BRANCH=1 git push ...` once, or `git config devbox.allowDefaultBranch true` for one repo. GitHub rulesets enforce shared branch policy on the server. Repos that set their own `core.hooksPath` (husky) skip the git hook, but the Claude push hook still applies.
 
 Edit `agents/AGENTS.md`, commit, and every agent picks it up on its next session. Keep it short, because it loads into every agent's context. Put project details in the project's own `AGENTS.md`, not here.
 
@@ -205,7 +207,7 @@ make verify-agent-workflow
 | `stow` or `bun` not found | Run `./setup.sh`, or install them yourself. |
 | `agents-sync` can't find the repo | Run it from inside `~/devbox-config`. |
 | Menu bar plugin shows nothing | Check SwiftBar's plugin folder is `~/.config/swiftbar/plugins` and Bun is installed. |
-| "Blocked: you are on 'main'" | Intended. `git switch -c feat/<topic>`, or see the override above. |
+| "Blocked: this push updates 'main'" | Intended. Push your feature branch and open a PR, or see the override above. |
 | `command not found: ai-usage` | Add `export PATH="$HOME/.local/bin:$PATH"` to your shell profile. |
 
 More detail: [`agents/README.md`](agents/README.md) (agent setup) and [`scripts/README.md`](scripts/README.md) (CLI tools).

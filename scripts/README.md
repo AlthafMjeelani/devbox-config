@@ -44,15 +44,15 @@ env-check [dir] --sync   # add missing keys from .env to .env.example with safe 
 
 Exits 1 on any FAIL (tracked `.env`, not ignored, ignored example, real-looking secret in the example).
 
-## guard-default-branch - keep agents off main
+## guard-default-branch - no direct pushes to main
 
-Blocks commits and Claude Code edits on `main`, `master`, `develop`, `trunk` and a repo's default branch, and Claude Code pushes that update those branches. `dev` and `staging` are protected too. Used by the global Git `pre-commit` and `pre-push` hooks and two Claude Code `PreToolUse` hooks.
+Blocks direct and force pushes to `main`, `master`, `develop`, `trunk`, `dev`, `staging` and a repo's default branch. Editing and committing are never blocked. Used by the global Git `pre-push` hook and one Claude Code `PreToolUse` Bash hook.
 
 ```bash
-guard-default-branch check [dir]            # exit 1 on a protected branch
+guard-default-branch check-branch <name>    # exit 1 if <name> is protected
 guard-default-branch claude-push-hook       # Bash hook: exit 2 when a git push targets a protected branch
-guard-default-branch install-claude-hook    # merge both hooks into ~/.claude/settings.json
-ALLOW_DEFAULT_BRANCH=1 git commit ...       # one-off override
+guard-default-branch install-claude-hook    # merge the push hook into ~/.claude/settings.json
+ALLOW_DEFAULT_BRANCH=1 git push ...         # one-off override
 git config devbox.allowDefaultBranch true   # allow in one repo
 ```
 
