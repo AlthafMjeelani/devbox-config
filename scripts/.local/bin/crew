@@ -31,7 +31,7 @@
 #
 # crew is scoped per repository: sessions and state are namespaced by a repo key (stable
 # across the repo's worktrees), so ls/status/watch show only the current repo's crewmates.
-# Pass --all to span every repo. The orchestrator reviews work, stages commits, and integrates them before Gate.
+# Pass --all to span every repo. Crewmates commit on their own branch and never push. Review each ready branch and ship it with Gate.
 # Backend: herdr inside herdr, Rex inside Rex, otherwise tmux when available.
 # CREW_BACKEND=tmux|herdr|rex overrides detection. Also: git-wt + ai-branch-name (PATH), opencode/claude/codex/kimi/amp/commandcode. Run from inside
 # the target git repo.
@@ -93,7 +93,7 @@ crewmate_alive() {
 
 PREFIX="crew_"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/crew"
-TASK_SUFFIX="You are the worker assigned by the orchestrator. Complete this task yourself and report questions, blockers, and results to the orchestrator. Do not use sudo, rewrite history, access unrelated files or secrets, deploy, or perform other outward-facing actions. When done, report the changed paths and verification to the orchestrator. Leave Git staging and commits to the orchestrator. Do not push. If blocked, print BLOCKED: <reason> and stop."
+TASK_SUFFIX="You are a crewmate assigned by the captain. Complete this task yourself and report questions, blockers, and results to the captain. Do not use sudo, rewrite history, access unrelated files or secrets, deploy, or perform other outward-facing actions. When done, commit your work on this branch with a Conventional-commit message and report the changed paths and verification. Do not push. If blocked, print BLOCKED: <reason> and stop."
 KIMI_TASK_SUFFIX="Do not use sudo, rewrite Git history, delete the worktree, or perform any other destructive or outward-facing action."
 AMP_TASK_SUFFIX="$KIMI_TASK_SUFFIX"
 COMMANDCODE_TASK_SUFFIX="$KIMI_TASK_SUFFIX"

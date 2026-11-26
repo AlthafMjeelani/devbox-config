@@ -5,7 +5,7 @@ description: Plan and run multi-agent workflows - split a goal into independent 
 
 # Agent orchestration
 
-You are the orchestrator. Workers do bounded tasks; you decompose, dispatch, verify and integrate.
+You are the captain. Crewmates do bounded tasks, each committing on its own branch; you decompose, dispatch and monitor, and the user ships each branch.
 
 This flow starts automatically whenever a task involves more than one agent (Codex, crew, subagents, parallel workers); the user does not need to ask for it.
 Resolve routine dispatch decisions yourself and bring the user decisions that require their authority.
@@ -15,14 +15,14 @@ Resolve routine dispatch decisions yourself and bring the user decisions that re
 2. **Decompose** into tasks that touch disjoint files. If two tasks need the same file, sequence them or merge them. Keep each task completable in one sitting.
 3. **Write a task brief** per worker (template below). One brief, one outcome.
 4. **Dispatch** each worker into its own worktree and session:
-   - `crew new -b agent/<task-id>-<role> "<task>" [--claude|--codex|--kimi|--amp|--commandcode] [--profile fast|standard|deep]` (headless, reports changes for the orchestrator).
+   - `crew new -b agent/<task-id>-<role> "<task>" [--claude|--codex|--kimi|--amp|--commandcode] [--profile fast|standard|deep]` (headless; the crewmate commits on its own branch and never pushes).
    - When the user names Codex or Claude as the worker, use direct delegation below. Otherwise use Crew.
    - Open one named worker session in Rex or workspace in Herdr for each task.
    - Crew chooses the current terminal backend automatically. Announce the worker name and the command the user can use to watch.
    - Keep the conversation in the original pane and keep worker output available after completion.
 5. **Monitor** with `crew status` / `crew watch`, or `rex-agents watch`. Do not poll in a tight loop; wait for finished or blocked events.
 6. **Review** every branch yourself: read the diff, run the tests. A worker's summary is not proof.
-7. **Integrate when authorized** in dependency order and run the full suite on the integrated result.
+7. **Hand off for shipping.** Each ready branch is reviewed and shipped on its own by the user. If branches depend on each other, say in what order to merge them.
 8. **Clean up** when authorized. Keep worker sessions available while the user wants to inspect output.
 
 ## Delegating directly to Codex or Claude
@@ -95,7 +95,7 @@ Report: write REPORT.md with what changed, what you verified, open questions
 
 ## Guardrails
 - Max 3-5 workers at once; more makes review the bottleneck.
-- Workers never push or deploy. You (or `gate`) ship after review.
+- Crewmates never push or deploy. The user (or `gate`) ships each branch after review.
 - Stop and ask the user before irreversible actions: deleting data, publishing, spending money.
 - If a worker is `blocked` (permission, question, auth), answer it or reassign; do not leave it waiting.
 - Record the plan and status in a `PLAN.md` in the main worktree so a restart can resume.

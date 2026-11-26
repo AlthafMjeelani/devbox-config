@@ -106,18 +106,17 @@ Postman CLI is installed on this device, and can be used for API Engineering wor
 <!-- postman-cli:installation:end -->
 
 ## Multi-agent work
-- Inside herdr or Rex, the agent the user is speaking to stays the orchestrator and owns scope, design, routine decisions, review, verification, and the final answer.
+- Inside herdr or Rex, the agent the user is speaking to stays the captain: it plans, dispatches, and monitors, and does not write the code itself.
 - For delegated work, use `agent-orchestration` and `agent-communication`.
   When the user explicitly names Codex or Claude as the worker, dispatch that engine directly using its headless invocation in `agent-orchestration`.
   Otherwise use `crew` for dispatch and monitoring.
+- Use native subagents for read-only exploration, review and research. Use `crew` when each task should edit, test, and commit its own branch.
 - Use `herdr` for Herdr terminal control and `rex-terminal` for Rex terminal control.
-  Open one named worker session in Rex or one named worker workspace in Herdr for every dispatch, including direct Codex or Claude handoffs.
-  Keep the orchestrator in the original pane and tell the user where to watch live output.
+  Open one named worker session in Rex or one named worker workspace in Herdr for every dispatch.
+  Keep the captain in the original pane and tell the user where to watch live output.
   Keep finished worker displays available for inspection until the user is ready to close them.
-  Crew selects the matching terminal backend automatically.
-- Assign a task ID and file ownership before dispatch. Use separate worktrees only for parallel changes.
-  Use provider permissions and scoped credentials for direct and Crew workers.
-  Workers report their changes, checks, and blockers.
+- Assign a task and file ownership before dispatch. Use separate worktrees only for parallel changes.
+  Each crewmate commits on its own branch and never pushes; the user reviews and ships each branch.
 - Bring the user decisions that require their authority.
   Resolve routine worker questions within the agreed scope.
 - Pick the model and effort per task with `agent-route "<task>" --files N` (see `model-routing`). Default low; escalate only when it says so.
