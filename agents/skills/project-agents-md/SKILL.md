@@ -35,7 +35,7 @@ A good `AGENTS.md` is the cheapest way to cut tokens: the agent stops exploring 
 - <state management, naming, error handling, API style, formatting>
 
 ## Workflow
-- Work on a feature branch (`feat/...`, `fix/...`); never commit to `main`.
+- Work on the current branch; do not create new branches or PRs unless asked. Never push directly or force-push to `main`.
 - Commit style: <conventional commits>. Do not push or open PRs unless asked.
 - Config lives in `.env.example`; never commit real `.env` files.
 
