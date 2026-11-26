@@ -54,6 +54,8 @@ Before finishing:
 - Conventional-commit style subjects (`feat:`, `fix:`, `chore:` ...).
 - Commit or push only when asked. Stay on the current branch; do not create new branches or PRs unless asked.
 - Never auto-add the agent name as a co-author or `Co-Authored-By` trailer.
+- After a branch is merged or rebased into the default branch, delete it locally (`git branch -d`) and on the remote (`git push origin --delete <branch>`), then `git fetch --prune`.
+  First confirm it landed (`git branch --merged <default>`, or `git cherry`, or the PR is merged). Never delete protected branches or a branch with unmerged commits or an open PR.
 
 ## Quality bar
 - No half-done work. If tests fail or a step is skipped, say so plainly with the output.
