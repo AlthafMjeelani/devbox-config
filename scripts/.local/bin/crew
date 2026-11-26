@@ -255,8 +255,8 @@ resolve_profile() {
 	local profile="$1" engine="$2"
 	case "$profile" in fast|standard|deep) ;; *) die "unknown crew profile '$profile' (use fast, standard, or deep)" ;; esac
 	local model
-	model=$("$SCRIPT_DIR/agent-model" "$engine" "$profile" model) \
-		|| die "no model for engine '$engine' profile '$profile' (run: agent-model --init, then fill in ~/.config/agents/tiers.json)"
+	# Empty means "use the CLI's own default model": the --model flag is dropped (see nm).
+	model=$("$SCRIPT_DIR/agent-model" "$engine" "$profile" model 2>/dev/null) || model=
 	printf '%s' "$model"
 }
 
@@ -336,7 +336,11 @@ enter_crewmate() {
 	fi
 }
 
-worker_command() {
+# Run a command-builder and drop an empty `--model ''` so that engine falls back to its own default.
+nm() { local c; c=$("$@"); printf '%s' "${c// --model \'\'/}"; }
+
+worker_command() { local c; c=$(_worker_command); printf '%s' "${c// --model \'\'/}"; }
+_worker_command() {
 	local full
 	full=$(task_with_guardrails "$engine" "$task")
 	printf 'export CREW_MANAGED=1; '
@@ -402,11 +406,11 @@ herdr_spawn() {
 	else
 		printf 'interactive\n' > "$sdir/status"
 		case "$engine" in
-			kimi) herdr pane run "$pane" "$(printf 'kimi --model %q' "$model")" >/dev/null ;;
-			amp)  herdr pane run "$pane" "$(amp_interactive_command "$model")" >/dev/null ;;
-			commandcode) herdr pane run "$pane" "$(commandcode_interactive_command "$model")" >/dev/null ;;
-			antigravity|agy) herdr pane run "$pane" "$(antigravity_interactive_command "$model")" >/dev/null ;;
-			codex) herdr pane run "$pane" "$(codex_interactive_command "$model" "$profile")" >/dev/null ;;
+			kimi) herdr pane run "$pane" "$(nm printf 'kimi --model %q' "$model")" >/dev/null ;;
+			amp)  herdr pane run "$pane" "$(nm amp_interactive_command "$model")" >/dev/null ;;
+			commandcode) herdr pane run "$pane" "$(nm commandcode_interactive_command "$model")" >/dev/null ;;
+			antigravity|agy) herdr pane run "$pane" "$(nm antigravity_interactive_command "$model")" >/dev/null ;;
+			codex) herdr pane run "$pane" "$(nm codex_interactive_command "$model" "$profile")" >/dev/null ;;
 			*)    herdr pane run "$pane" "$engine" >/dev/null ;;
 		esac
 	fi
@@ -518,16 +522,16 @@ cmd_new() {
 			else
 				printf 'interactive\n' > "$sdir/status"
 				case "$engine" in
-					kimi) tmux send-keys -t "$name" "$(printf 'kimi --model %q' "$model")" C-m ;;
-					amp)  tmux send-keys -t "$name" "$(amp_interactive_command "$model")" C-m ;;
-					commandcode) tmux send-keys -t "$name" "$(commandcode_interactive_command "$model")" C-m ;;
-					antigravity|agy) tmux send-keys -t "$name" "$(antigravity_interactive_command "$model")" C-m ;;
-					codex) tmux send-keys -t "$name" "$(codex_interactive_command "$model" "$profile")" C-m ;;
+					kimi) tmux send-keys -t "$name" "$(nm printf 'kimi --model %q' "$model")" C-m ;;
+					amp)  tmux send-keys -t "$name" "$(nm amp_interactive_command "$model")" C-m ;;
+					commandcode) tmux send-keys -t "$name" "$(nm commandcode_interactive_command "$model")" C-m ;;
+					antigravity|agy) tmux send-keys -t "$name" "$(nm antigravity_interactive_command "$model")" C-m ;;
+					codex) tmux send-keys -t "$name" "$(nm codex_interactive_command "$model" "$profile")" C-m ;;
 					*)    tmux send-keys -t "$name" "$engine" C-m ;;
 				esac
 			fi
 		fi
-		printf 'crew %s ready in %s (%s, %s)\n' "$name" "$path" "$profile" "$model"
+		printf 'crew %s ready in %s (%s, %s)\n' "$name" "$path" "$profile" "${model:-default}"
 		printf '  monitor: crew status %s   attach: crew attach %s\n' "$branch" "$branch"
 	fi
 

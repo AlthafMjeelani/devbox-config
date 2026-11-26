@@ -10,14 +10,14 @@ How to pick models, keep them current, and spend tokens on purpose.
 | Features, fixes, tests, review | standard | medium |
 | Docs, renames, search, summaries | fast | low |
 
-Model names are not stored in this repo. They live in your local file `~/.config/agents/tiers.json`:
+Model names are not stored in this repo, and setting them is **optional**. If you set nothing, every engine runs its own default model (Claude, Pi and Amp use the alias-only tiers in `agents/tiers.example.json`). To pin models, use your local file `~/.config/agents/tiers.json`:
 
 ```bash
 agent-model --init     # copy the template to ~/.config/agents/tiers.json (never overwrites)
 agent-model --check    # list engines and tiers that still have no model
 ```
 
-Fill in a model per engine and tier there. Claude, Pi and Amp are prefilled with aliases or modes. Codex, OpenCode, Kimi, Command Code and Antigravity start empty, and `crew`/`gate` stop with a clear message until you set them.
+Fill in a model per engine and tier there. Claude, Pi and Amp are prefilled with aliases or modes. Codex, OpenCode, Kimi, Command Code and Antigravity start empty, which means the CLI's own default model is used (the `--model` flag is simply left out).
 Override one value for a single run with `AGENT_MODEL_<ENGINE>_<TIER>` (and `_EFFORT`), or point `AGENT_TIERS` at another file.
 
 Role-level choices (reviewer, debugger, tester and so on) live in `agents/models.json` as tiers only. After editing it, run `agents-sync`.

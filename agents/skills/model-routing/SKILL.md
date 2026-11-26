@@ -14,7 +14,7 @@ Use the strongest model where mistakes are expensive, and the cheapest one that 
 | Normal features, fixes, tests, code review | standard | medium |
 | Docs, renames, formatting, search, summaries, commit messages | fast | low |
 
-No model names live in the repo. `agent-model <engine> <tier> [model|effort]` resolves them from env `AGENT_MODEL_<ENGINE>_<TIER>`, then `~/.config/agents/tiers.json` (local; create with `agent-model --init`), then the alias-only template `agents/tiers.example.json`. Roles map to tiers in `agents/models.json`; change it there, then run `agents-sync`.
+No model names live in the repo, and setting them is optional (empty means the CLI's own default model). `agent-model <engine> <tier> [model|effort]` resolves them from env `AGENT_MODEL_<ENGINE>_<TIER>`, then `~/.config/agents/tiers.json` (local; create with `agent-model --init`), then the alias-only template `agents/tiers.example.json`. Roles map to tiers in `agents/models.json`; change it there, then run `agents-sync`.
 
 ## Rules
 1. Always use the newest model in the tier. Claude aliases (`opus`, `sonnet`, `haiku`) already track the latest. For other engines, update `~/.config/agents/tiers.json` when a newer model ships.
