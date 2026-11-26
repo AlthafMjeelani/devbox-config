@@ -1,3 +1,5 @@
+> Superseded: the current flow is [Multi-agent flow](MULTI-AGENT-FLOW.md). Crewmates now commit on their own branches and you ship each one; there is no shared integration branch. This page describes the earlier orchestrator-first design.
+
 # Orchestrator-first Git workflow
 
 1. Start on one task branch, for example `task/142-orchestration`. Record the task ID, acceptance checks, dependencies, and file ownership.

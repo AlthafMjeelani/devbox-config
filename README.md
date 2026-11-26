@@ -74,6 +74,20 @@ Run `rex skill setup --agent claude --agent codex` to install Rex’s official s
 
 If Rex says the CLI is not allowed, turn on Remote Control in Rex settings. `rex config check` validates `init.lua`; a binding that Rex rejects can simply be deleted, because Rex works with no config.
 
+## Multi-agent workflow
+
+Build several independent changes in parallel. You talk to one agent, the captain. It splits the work, starts one crewmate per task with `crew`, and each crewmate commits on its own branch and never pushes. You review and ship each branch.
+
+```text
+You:      Build these two in parallel with crew: 1) dark mode toggle  2) fix login redirect
+Captain:  crew new "<brief 1>"   crew new "<brief 2>"      (one branch and worktree each)
+You:      crew status   crew attach <branch>   crew logs <branch> -f
+You:      review each branch, then /ship-gate               (pushes the branch, opens a draft PR)
+You:      crew cleanup <branch>                             (after it is merged)
+```
+
+The full walkthrough, with engines, profiles and rules, is in [docs/MULTI-AGENT-FLOW.md](docs/MULTI-AGENT-FLOW.md).
+
 ## Where agent rules live
 
 | File | Applies to | Use it for |
