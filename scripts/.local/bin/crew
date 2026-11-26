@@ -109,8 +109,9 @@ COMMANDCODE_GUARD_HOOK="$HOME/.commandcode/hooks/crew-guard.sh"
 ANTIGRAVITY_PRINT_TIMEOUT="${CREW_AGY_PRINT_TIMEOUT:-4h}"
 
 codex_reasoning_flag() {
-	[ "$1" = fast ] || return 0
-	printf '%s' '-c model_reasoning_effort=low'
+	local effort
+	effort=$("$SCRIPT_DIR/agent-model" codex "$1" effort 2>/dev/null) || return 0
+	[ -z "$effort" ] || printf '%s' "-c model_reasoning_effort=$effort"
 }
 
 codex_headless_command() {
@@ -252,30 +253,11 @@ require_commandcode_guard() {
 # machine-local default. Standard is deliberately the default for implementation work.
 resolve_profile() {
 	local profile="$1" engine="$2"
-	case "$profile:$engine" in
-		fast:opencode)   printf '%s' 'openai/gpt-6-luna-low' ;;
-		standard:opencode) printf '%s' 'openai/gpt-6.1-terra' ;;
-		deep:opencode)   printf '%s' 'openai/gpt-6.1-sol' ;;
-		fast:claude)     printf '%s' 'haiku' ;;
-		standard:claude) printf '%s' 'sonnet' ;;
-		deep:claude)     printf '%s' 'opus' ;;
-		fast:codex)      printf '%s' 'gpt-6-luna' ;;
-		standard:codex)  printf '%s' 'gpt-6.1-terra' ;;
-		deep:codex)      printf '%s' 'gpt-6.1-sol' ;;
-		fast:kimi)       printf '%s' 'kimi-code/kimi-for-coding' ;;
-		standard:kimi)   printf '%s' 'kimi-code/kimi-for-coding' ;;
-		deep:kimi)       printf '%s' 'kimi-code/k3' ;;
-		fast:amp)         printf '%s' 'low' ;;
-		standard:amp)     printf '%s' 'medium' ;;
-		deep:amp)         printf '%s' 'high' ;;
-		fast:commandcode)     printf '%s' 'deepseek/deepseek-v4-flash' ;;
-		standard:commandcode) printf '%s' 'deepseek/deepseek-v4-pro' ;;
-		deep:commandcode)     printf '%s' 'Qwen/Qwen3.7-Max' ;;
-		fast:antigravity|fast:agy)         printf '%s' 'gemini-3.8-flash-low' ;;
-		standard:antigravity|standard:agy) printf '%s' 'gemini-3.8-flash-high' ;;
-		deep:antigravity|deep:agy)         printf '%s' 'gemini-3.1-pro-high' ;;
-		*) die "unknown crew profile '$profile' (use fast, standard, or deep)" ;;
-	esac
+	case "$profile" in fast|standard|deep) ;; *) die "unknown crew profile '$profile' (use fast, standard, or deep)" ;; esac
+	local model
+	model=$("$SCRIPT_DIR/agent-model" "$engine" "$profile" model) \
+		|| die "no model for engine '$engine' profile '$profile' (run: agent-model --init, then fill in ~/.config/agents/tiers.json)"
+	printf '%s' "$model"
 }
 
 # Sanitize a name for use in tmux targets / paths: /, ., : -> _

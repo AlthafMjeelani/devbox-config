@@ -1,12 +1,14 @@
 #!/usr/bin/env bun
 // agent-route - pick the model tier and reasoning effort for a task, for any agent.
 //
-//   agent-route "task description" [--files N] [--engine codex|claude|opencode|all] [--json]
+//   agent-route "task description" [--files N] [--engine codex|claude|opencode|pi|all] [--json]
 //   agent-route --tier "task"      Print only the tier (fast|standard|deep); used by `crew --profile auto`.
 //
 // Default is cheap: low effort. It escalates only on risk or size signals (security, auth, payments,
 // migrations, concurrency, architecture, many files). Tune the word lists below.
+// Model names come from `agent-model` (env or ~/.config/agents/tiers.json); none are stored here. With no name set, the CLI default is used.
 import fs from "node:fs";
+import path from "node:path";
 
 export type Tier = "fast" | "standard" | "deep";
 export type Effort = "low" | "medium" | "high";
@@ -42,17 +44,23 @@ export function route(task: string, files = 0): { tier: Tier; effort: Effort; sc
   return { tier: "deep", effort: "high", score: s };
 }
 
-const MODELS = {
-  codex: { fast: "gpt-6-luna", standard: "gpt-6.1-terra", deep: "gpt-6.1-sol" },
-  claude: { fast: "haiku", standard: "sonnet", deep: "opus" },
-  opencode: { fast: "openai/gpt-6-luna-low", standard: "openai/gpt-6.1-terra", deep: "openai/gpt-6.1-sol" },
-} as const;
+// Model names are never stored here or in the repo. `agent-model` resolves them from env or ~/.config/agents/tiers.json.
+function modelFor(engine: string, tier: Tier, field: "model" | "effort" = "model"): string {
+  const bin = path.join(path.dirname(fs.realpathSync(import.meta.path)), "agent-model");
+  const r = Bun.spawnSync([bin, engine, tier, field], { stdout: "pipe", stderr: "pipe", env: process.env as Record<string, string> });
+  return r.exitCode === 0 ? r.stdout.toString().trim() : "";
+}
 
-export function command(engine: keyof typeof MODELS, tier: Tier, effort: Effort): string {
-  const m = MODELS[engine][tier];
-  if (engine === "codex") return `codex -m ${m} -c model_reasoning_effort=${effort}`;
-  if (engine === "claude") return `claude --model ${m}`;
-  return `opencode --model ${m}`;
+const LAUNCHERS: Record<string, (model: string, effort: Effort) => string> = {
+  codex: (m, e) => `codex${m ? ` -m ${m}` : ""} -c model_reasoning_effort=${e}`,
+  claude: (m) => `claude${m ? ` --model ${m}` : ""}`,
+  opencode: (m) => `opencode${m ? ` --model ${m}` : ""}`,
+  pi: (m, e) => `pi${m ? ` --model ${m}:${e}` : ` --thinking ${e}`}`,
+};
+
+export function command(engine: string, tier: Tier, effort: Effort): string {
+  if (!LAUNCHERS[engine]) throw new Error(`no launcher for engine '${engine}'`);
+  return LAUNCHERS[engine](modelFor(engine, tier), effort);
 }
 
 if (import.meta.main) {
@@ -68,7 +76,7 @@ if (import.meta.main) {
   const r = route(task, Number(val("--files") ?? 0));
   if (a.includes("--tier")) { console.log(r.tier); process.exit(0); }
   const eng = (val("--engine") ?? "all") as string;
-  const engines = (eng === "all" ? Object.keys(MODELS) : [eng]) as (keyof typeof MODELS)[];
+  const engines = eng === "all" ? Object.keys(LAUNCHERS) : [eng];
   const cmds = Object.fromEntries(engines.map((e) => [e, command(e, r.tier, r.effort)]));
   if (a.includes("--json")) console.log(JSON.stringify({ ...r, commands: cmds }, null, 2));
   else {

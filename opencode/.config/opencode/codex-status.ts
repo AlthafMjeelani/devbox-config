@@ -18,6 +18,17 @@ import path from "node:path";
 import { Database } from "bun:sqlite";
 import type { TuiPlugin, TuiPluginModule, TuiPluginApi } from "@opencode-ai/plugin/tui";
 
+function fallbackContextWindow(modelID: string): number | null {
+  try {
+    const file = process.env.AGENT_TIERS || path.join(os.homedir(), ".config/agents/tiers.json");
+    const table = JSON.parse(fs.readFileSync(file, "utf8")).context_windows as Record<string, number> | undefined;
+    const prefix = Object.keys(table ?? {}).filter((k) => modelID.startsWith(k)).sort((x, y) => y.length - x.length)[0];
+    return prefix ? table![prefix] : null;
+  } catch {
+    return null;
+  }
+}
+
 const CODEX_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 const TOKEN_URL = "https://auth.openai.com/oauth/token";
 const USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
@@ -426,9 +437,8 @@ function contextLimit(api: TuiPluginApi, model: { providerID: string; modelID: s
     if (typeof limit === "number" && limit > 0) return limit;
   }
 
-  if (model.modelID.startsWith("gpt-5.5")) return 1_050_000;
-  if (model.modelID.startsWith("gpt-5.4") || model.modelID.startsWith("gpt-5.1")) return 400_000;
-  return null;
+  // Fallback table lives in ~/.config/agents/tiers.json ("context_windows": { "<model id prefix>": tokens }).
+  return fallbackContextWindow(model.modelID);
 }
 
 function latestContextSampleFromState(api: TuiPluginApi, sessionID: string): ContextSample | null {

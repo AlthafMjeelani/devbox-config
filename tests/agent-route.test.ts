@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
 import path from "node:path";
+
+process.env.AGENT_TIERS = path.resolve(import.meta.dir, "fixtures/tiers.json");
 import { route, command } from "../scripts/.local/bin/agent-route";
 
 test("small mechanical tasks go fast and low", () => {
@@ -17,10 +19,18 @@ test("file count escalates", () => {
   expect(route("refactor module", 20).tier).toBe("deep");
 });
 test("commands per engine", () => {
-  expect(command("codex", "deep", "medium")).toBe("codex -m gpt-6.1-sol -c model_reasoning_effort=medium");
-  expect(command("claude", "fast", "low")).toBe("claude --model haiku");
+  expect(command("codex", "deep", "medium")).toBe("codex -m test-codex-deep -c model_reasoning_effort=medium");
+  expect(command("claude", "fast", "low")).toBe("claude --model test-claude-fast");
 });
 test("cli --tier", () => {
   const bin = path.resolve(import.meta.dir, "../scripts/.local/bin/agent-route");
   expect(Bun.spawnSync(["bun", bin, "--tier", "fix typo"]).stdout.toString().trim()).toBe("fast");
+});
+test("pi and opencode commands come from the tier file", () => {
+  expect(command("pi", "standard", "low")).toBe("pi --model test-pi-standard:low");
+  expect(command("opencode", "deep", "low")).toBe("opencode --model test-opencode-deep");
+});
+test("no model name is hard-coded in the router", () => {
+  const src = require("node:fs").readFileSync(path.resolve(import.meta.dir, "../scripts/.local/bin/agent-route"), "utf8");
+  expect(src).not.toMatch(/gpt-\d|gemini-\d|claude-[a-z]+-\d|deepseek|kimi-code|Qwen/);
 });

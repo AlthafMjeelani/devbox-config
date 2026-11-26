@@ -1,0 +1,75 @@
+#!/usr/bin/env bun
+// agent-model - print the model or effort for an engine and tier. No model names are stored in this repo.
+//
+//   agent-model <engine> <fast|standard|deep> [model|effort]   print the model (default) or effort
+//   agent-model --default-tier | --default-effort | --engines
+//   agent-model --init     create ~/.config/agents/tiers.json from the template (never overwrites)
+//   agent-model --check    list engine and tier slots that still have no model
+//
+// Lookup order for each value:
+//   1. env AGENT_MODEL_<ENGINE>_<TIER> (model) or AGENT_MODEL_<ENGINE>_<TIER>_EFFORT
+//   2. $AGENT_TIERS or ~/.config/agents/tiers.json (your machine's file, not tracked)
+//   3. agents/tiers.example.json in the repo (vendor aliases and efforts only)
+// An empty model exits 3 with a message telling you where to set it.
+import fs from "node:fs";
+import path from "node:path";
+
+export type Entry = { model?: string; effort?: string };
+export type Tiers = {
+  default_tier?: string;
+  default_effort?: string;
+  engines?: Record<string, Record<string, Entry>>;
+  context_windows?: Record<string, number>;
+};
+
+const here = () => path.dirname(fs.realpathSync(import.meta.path));
+export const examplePath = () => path.join(here(), "../../../agents/tiers.example.json");
+export const localPath = () => process.env.AGENT_TIERS || path.join(process.env.HOME ?? "", ".config/agents/tiers.json");
+
+function read(p: string): Tiers {
+  try { return JSON.parse(fs.readFileSync(p, "utf8")) as Tiers; } catch { return {}; }
+}
+
+export function loadTiers(): { local: Tiers; base: Tiers } {
+  return { local: read(localPath()), base: read(examplePath()) };
+}
+
+export function lookup(engine: string, tier: string, field: "model" | "effort"): string {
+  const e = engine === "agy" ? "antigravity" : engine;
+  const env = process.env[`AGENT_MODEL_${e.toUpperCase()}_${tier.toUpperCase()}${field === "effort" ? "_EFFORT" : ""}`];
+  if (env !== undefined) return env;
+  const { local, base } = loadTiers();
+  const v = local.engines?.[e]?.[tier]?.[field];
+  if (v) return v;
+  return base.engines?.[e]?.[tier]?.[field] ?? "";
+}
+
+if (import.meta.main) {
+  const a = process.argv.slice(2);
+  const fail = (m: string, code = 1) => { console.error(`agent-model: ${m}`); process.exit(code); };
+  const { local, base } = loadTiers();
+  if (a[0] === "--default-tier") console.log(local.default_tier || base.default_tier || "standard");
+  else if (a[0] === "--default-effort") console.log(local.default_effort || base.default_effort || "low");
+  else if (a[0] === "--engines") console.log(Object.keys({ ...base.engines, ...local.engines }).join("\n"));
+  else if (a[0] === "--init") {
+    const dest = localPath();
+    if (fs.existsSync(dest)) console.log(`${dest} already exists; left unchanged`);
+    else { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.copyFileSync(examplePath(), dest); console.log(`created ${dest}; fill in the empty "model" values`); }
+  } else if (a[0] === "--check") {
+    let missing = 0;
+    for (const eng of Object.keys({ ...base.engines, ...local.engines })) for (const t of ["fast", "standard", "deep"]) {
+      if (!lookup(eng, t, "model")) { console.log(`${eng} ${t}: no model set`); missing++; }
+    }
+    console.log(missing ? `${missing} slot(s) empty in ${localPath()}` : "all slots set");
+    process.exit(missing ? 3 : 0);
+  } else if (a.length >= 2) {
+    const field = (a[2] ?? "model") as "model" | "effort";
+    if (field !== "model" && field !== "effort") fail(`unknown field '${a[2]}' (use model or effort)`);
+    const v = lookup(a[0], a[1], field);
+    if (field === "model" && !v) fail(`no model set for ${a[0]} ${a[1]}. Set it in ${localPath()} (run: agent-model --init) or export AGENT_MODEL_${a[0].toUpperCase()}_${a[1].toUpperCase()}`, 3);
+    console.log(v);
+  } else {
+    console.log(fs.readFileSync(import.meta.path, "utf8").split("\n").slice(1, 15).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
+    process.exit(a.length ? 0 : 2);
+  }
+}

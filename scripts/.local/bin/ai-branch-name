@@ -9,13 +9,8 @@
 #   ai-branch-name [--engine opencode|claude|codex|kimi|amp] <task words...>
 #
 # Engine: default `opencode`; override with --engine or $WT_AI_ENGINE.
-#   opencode -> uses the configured `small_model` (see ~/.config/opencode/
-#               opencode.json, default openai/gpt-5.4-nano) - naming is cheap/fast.
-#   claude   -> claude -p ... (haiku, for speed)
-#   codex    -> codex exec ...
-#   kimi     -> kimi -p ... (regular K2.7 Code, for speed and reliability)
-#   amp      -> amp -m low -x ...
-#   antigravity -> agy --model gemini-3.8-flash-high -p ...
+#   Every engine uses its fast tier from `agent-model` (env or ~/.config/agents/tiers.json).
+#   opencode uses its configured `small_model` first. With no model set, the CLI default is used.
 #
 # Robustness: the model call is wrapped in `timeout`. If the engine is missing,
 # errors, times out, or returns nothing usable, we fall back to a deterministic
@@ -25,7 +20,8 @@ set -euo pipefail
 
 AI_TIMEOUT="${WT_AI_TIMEOUT:-60}"
 OPENCODE_CONFIG="${HOME}/.config/opencode/opencode.json"
-DEFAULT_SMALL_MODEL="openai/gpt-5.4-nano"
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+fast_model() { "$SCRIPT_DIR/agent-model" "$1" fast model 2>/dev/null || true; }
 
 engine="${WT_AI_ENGINE:-opencode}"
 while [ $# -gt 0 ]; do
@@ -72,7 +68,7 @@ opencode_small_model() {
 	if command -v jq >/dev/null 2>&1 && [ -f "$OPENCODE_CONFIG" ]; then
 		m=$(jq -r '.small_model // empty' "$OPENCODE_CONFIG" 2>/dev/null) || m=""
 	fi
-	printf '%s' "${m:-$DEFAULT_SMALL_MODEL}"
+	printf '%s' "${m:-$(fast_model opencode)}"
 }
 
 PROMPT=$(printf '%s\n' \
@@ -84,32 +80,34 @@ PROMPT=$(printf '%s\n' \
 
 # Ask the selected engine; empty stdout on any failure so we fall back.
 ask_engine() {
+	local m; m=$(fast_model "$engine")
 	case "$engine" in
 		opencode)
 			command -v opencode >/dev/null 2>&1 || return 1
-			timeout "$AI_TIMEOUT" opencode run "$PROMPT" --model "$(opencode_small_model)" 2>/dev/null
+			m=$(opencode_small_model)
+			timeout "$AI_TIMEOUT" opencode run "$PROMPT" ${m:+--model "$m"} 2>/dev/null
 			;;
 		claude)
 			command -v claude >/dev/null 2>&1 || return 1
-			timeout "$AI_TIMEOUT" claude -p "$PROMPT" --model claude-haiku-5-5 --output-format text 2>/dev/null
+			timeout "$AI_TIMEOUT" claude -p "$PROMPT" ${m:+--model "$m"} --output-format text 2>/dev/null
 			;;
 		codex)
 			command -v codex >/dev/null 2>&1 || return 1
-			timeout "$AI_TIMEOUT" codex exec "$PROMPT" 2>/dev/null
+			timeout "$AI_TIMEOUT" codex exec ${m:+--model "$m"} "$PROMPT" 2>/dev/null
 			;;
 		kimi)
 			command -v kimi >/dev/null 2>&1 || return 1
-			timeout "$AI_TIMEOUT" kimi --model kimi-code/kimi-for-coding -p "$PROMPT" 2>/dev/null
+			timeout "$AI_TIMEOUT" kimi ${m:+--model "$m"} -p "$PROMPT" 2>/dev/null
 			;;
 		amp)
 			command -v amp >/dev/null 2>&1 || return 1
-			timeout "$AI_TIMEOUT" amp --no-notifications -m low -x "$PROMPT" 2>/dev/null
+			timeout "$AI_TIMEOUT" amp --no-notifications ${m:+-m "$m"} -x "$PROMPT" 2>/dev/null
 			;;
 		antigravity|agy)
 			local bin="agy"
 			command -v agy >/dev/null 2>&1 || bin="antigravity"
 			command -v "$bin" >/dev/null 2>&1 || return 1
-			timeout "$AI_TIMEOUT" "$bin" --model gemini-3.8-flash-high -p "$PROMPT" 2>/dev/null
+			timeout "$AI_TIMEOUT" "$bin" ${m:+--model "$m"} -p "$PROMPT" 2>/dev/null
 			;;
 		*) return 1 ;;
 	esac

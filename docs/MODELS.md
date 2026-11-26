@@ -4,19 +4,27 @@ How to pick models, keep them current, and spend tokens on purpose.
 
 ## Pick by task
 
-| Task | Tier | Claude | Codex | Antigravity | Effort |
-|---|---|---|---|---|---|
-| Architecture, security, hard bugs | deep | `opus` | `gpt-6.1-sol` | `gemini-3.1-pro-high` | high |
-| Features, fixes, tests, review | standard | `sonnet` | `gpt-6.1-terra` | `gemini-3.1-pro-high` | medium |
-| Docs, renames, search, summaries | fast | `haiku` | `gpt-6-luna` | `gemini-3.8-flash-*` | low |
+| Task | Tier | Effort |
+|---|---|---|
+| Architecture, security, hard bugs | deep | high |
+| Features, fixes, tests, review | standard | medium |
+| Docs, renames, search, summaries | fast | low |
 
-Role-level choices (reviewer, debugger, tester and so on) live in `agents/models.json`.
-After editing it, run `agents-sync` to regenerate the subagent files for Claude and Codex.
+Model names are not stored in this repo. They live in your local file `~/.config/agents/tiers.json`:
+
+```bash
+agent-model --init     # copy the template to ~/.config/agents/tiers.json (never overwrites)
+agent-model --check    # list engines and tiers that still have no model
+```
+
+Fill in a model per engine and tier there. Claude, Pi and Amp are prefilled with aliases or modes. Codex, OpenCode, Kimi, Command Code and Antigravity start empty, and `crew`/`gate` stop with a clear message until you set them.
+Override one value for a single run with `AGENT_MODEL_<ENGINE>_<TIER>` (and `_EFFORT`), or point `AGENT_TIERS` at another file.
+
+Role-level choices (reviewer, debugger, tester and so on) live in `agents/models.json` as tiers only. After editing it, run `agents-sync`.
 
 ## Keep models current
 
-- **Claude**: `opus`, `sonnet`, `haiku` are aliases that follow the newest release. Nothing to update.
-- **Codex and Gemini**: names are pinned. Once a month, check the vendor's model list and update `agents/models.json` and the profiles in `agents/codex-config.toml.example`, then `agents-sync`.
+- Edit `~/.config/agents/tiers.json` when a vendor ships a newer model. Claude aliases follow the newest release by themselves.
 - Only change a model on purpose, not mid-session (it breaks prompt caching).
 
 ## Codex settings that save tokens

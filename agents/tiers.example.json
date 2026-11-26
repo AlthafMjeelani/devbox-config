@@ -1,0 +1,48 @@
+{
+  "_note": "Template only. Real model names live in ~/.config/agents/tiers.json on each machine (run: agent-model --init). Nothing here pins a model version.",
+  "default_tier": "standard",
+  "default_effort": "low",
+  "engines": {
+    "claude": {
+      "fast": { "model": "haiku" },
+      "standard": { "model": "sonnet" },
+      "deep": { "model": "opus" }
+    },
+    "codex": {
+      "fast": { "model": "", "effort": "low" },
+      "standard": { "model": "", "effort": "low" },
+      "deep": { "model": "", "effort": "low" }
+    },
+    "opencode": {
+      "fast": { "model": "" },
+      "standard": { "model": "" },
+      "deep": { "model": "" }
+    },
+    "pi": {
+      "fast": { "model": "haiku", "effort": "low" },
+      "standard": { "model": "sonnet", "effort": "low" },
+      "deep": { "model": "opus", "effort": "low" }
+    },
+    "kimi": {
+      "fast": { "model": "" },
+      "standard": { "model": "" },
+      "deep": { "model": "" }
+    },
+    "amp": {
+      "fast": { "model": "low" },
+      "standard": { "model": "medium" },
+      "deep": { "model": "high" }
+    },
+    "commandcode": {
+      "fast": { "model": "" },
+      "standard": { "model": "" },
+      "deep": { "model": "" }
+    },
+    "antigravity": {
+      "fast": { "model": "" },
+      "standard": { "model": "" },
+      "deep": { "model": "" }
+    }
+  },
+  "context_windows": {}
+}

@@ -13,6 +13,8 @@ import {
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
+process.env.AGENT_TIERS = resolve(import.meta.dir, "fixtures/tiers.json");
+
 import workflowGuardrails, {
   blockedCommandReason,
   createLifecycleReporter,
@@ -192,7 +194,7 @@ describe("Amp plugin integration", () => {
 describe("Crew Amp execution", () => {
   const crew = readFileSync(resolve(repo, "scripts/.local/bin/crew"), "utf8");
   const callCrewFunction = (body: string) => {
-    const result = Bun.spawnSync(["bash", "-c", `source "$1"; ${body}`, "test", resolve(repo, "scripts/.local/bin/crew")]);
+    const result = Bun.spawnSync(["bash", "-c", `source "$1"; ${body}`, "test", resolve(repo, "scripts/.local/bin/crew")], { env: process.env as Record<string, string> });
     expect(result.exitCode).toBe(0);
     return result.stdout.toString();
   };
@@ -302,19 +304,21 @@ describe("Crew Amp execution", () => {
   });
 
   test("keeps the Codex fast model and reasoning effort separate", () => {
-    expect(callCrewFunction("resolve_profile fast codex")).toBe("gpt-6-luna");
-    const headless = callCrewFunction("codex_headless_command gpt-6-luna fast 'finish task'");
-    const interactive = callCrewFunction("codex_interactive_command gpt-6-luna fast");
-    expect(headless).toContain("exec --sandbox workspace-write --model gpt-6-luna");
+    expect(callCrewFunction("resolve_profile fast codex")).toBe("test-codex-fast");
+    const headless = callCrewFunction("codex_headless_command test-codex-fast fast 'finish task'");
+    const interactive = callCrewFunction("codex_interactive_command test-codex-fast fast");
+    expect(headless).toContain("exec --sandbox workspace-write --model test-codex-fast");
     expect(headless).toContain("model_reasoning_effort=low");
-    expect(interactive).toContain("codex --model gpt-6-luna");
+    expect(interactive).toContain("codex --model test-codex-fast");
     expect(interactive).toContain("model_reasoning_effort=low");
-    expect(headless).not.toContain("luna-low");
   });
 
-  test("does not override Codex reasoning effort outside the fast profile", () => {
-    expect(callCrewFunction("codex_headless_command gpt-6.1-terra standard 'finish task'")).not.toContain(
-      "model_reasoning_effort",
+  test("takes the Codex reasoning effort from the tier file for every profile", () => {
+    expect(callCrewFunction("codex_headless_command test-codex-standard standard 'finish task'")).toContain(
+      "model_reasoning_effort=medium",
+    );
+    expect(callCrewFunction("codex_headless_command test-codex-deep deep 'finish task'")).toContain(
+      "model_reasoning_effort=high",
     );
   });
 
@@ -349,15 +353,15 @@ describe("Crew Amp execution", () => {
 
 describe("Crew CommandCode execution", () => {
   const callCrewFunction = (body: string) => {
-    const result = Bun.spawnSync(["bash", "-c", `source "$1"; ${body}`, "test", resolve(repo, "scripts/.local/bin/crew")]);
+    const result = Bun.spawnSync(["bash", "-c", `source "$1"; ${body}`, "test", resolve(repo, "scripts/.local/bin/crew")], { env: process.env as Record<string, string> });
     expect(result.exitCode).toBe(0);
     return result.stdout.toString();
   };
 
   test("maps CommandCode profiles to cost-tiered models", () => {
-    expect(callCrewFunction("resolve_profile fast commandcode")).toBe("deepseek/deepseek-v4-flash");
-    expect(callCrewFunction("resolve_profile standard commandcode")).toBe("deepseek/deepseek-v4-pro");
-    expect(callCrewFunction("resolve_profile deep commandcode")).toBe("Qwen/Qwen3.7-Max");
+    expect(callCrewFunction("resolve_profile fast commandcode")).toBe("test-commandcode-fast");
+    expect(callCrewFunction("resolve_profile standard commandcode")).toBe("test-commandcode-standard");
+    expect(callCrewFunction("resolve_profile deep commandcode")).toBe("test-commandcode-deep");
   });
 
   test("runs headless CommandCode with the Crew guard and regular permissions", () => {
@@ -423,7 +427,7 @@ describe("CommandCode crew guard hook", () => {
 
 describe("Crew Antigravity execution", () => {
   const callCrewFunction = (body: string) => {
-    const result = Bun.spawnSync(["bash", "-c", `source "$1"; ${body}`, "test", resolve(repo, "scripts/.local/bin/crew")]);
+    const result = Bun.spawnSync(["bash", "-c", `source "$1"; ${body}`, "test", resolve(repo, "scripts/.local/bin/crew")], { env: process.env as Record<string, string> });
     expect(result.exitCode).toBe(0);
     return result.stdout.toString();
   };
@@ -443,9 +447,9 @@ describe("Crew Antigravity execution", () => {
   });
 
   test("maps Antigravity profiles to Gemini model tiers", () => {
-    expect(callCrewFunction("resolve_profile fast antigravity")).toBe("gemini-3.8-flash-low");
-    expect(callCrewFunction("resolve_profile standard antigravity")).toBe("gemini-3.8-flash-high");
-    expect(callCrewFunction("resolve_profile deep antigravity")).toBe("gemini-3.1-pro-high");
+    expect(callCrewFunction("resolve_profile fast antigravity")).toBe("test-antigravity-fast");
+    expect(callCrewFunction("resolve_profile standard antigravity")).toBe("test-antigravity-standard");
+    expect(callCrewFunction("resolve_profile deep antigravity")).toBe("test-antigravity-deep");
   });
 
   // Hermetic: a fake `agy` on PATH so the result does not depend on what is installed on the machine.

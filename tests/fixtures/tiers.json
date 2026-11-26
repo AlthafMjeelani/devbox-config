@@ -1,0 +1,103 @@
+{
+  "default_tier": "standard",
+  "default_effort": "low",
+  "engines": {
+    "claude": {
+      "fast": {
+        "model": "test-claude-fast"
+      },
+      "standard": {
+        "model": "test-claude-standard"
+      },
+      "deep": {
+        "model": "test-claude-deep"
+      }
+    },
+    "codex": {
+      "fast": {
+        "model": "test-codex-fast",
+        "effort": "low"
+      },
+      "standard": {
+        "model": "test-codex-standard",
+        "effort": "medium"
+      },
+      "deep": {
+        "model": "test-codex-deep",
+        "effort": "high"
+      }
+    },
+    "opencode": {
+      "fast": {
+        "model": "test-opencode-fast"
+      },
+      "standard": {
+        "model": "test-opencode-standard"
+      },
+      "deep": {
+        "model": "test-opencode-deep"
+      }
+    },
+    "pi": {
+      "fast": {
+        "model": "test-pi-fast",
+        "effort": "low"
+      },
+      "standard": {
+        "model": "test-pi-standard",
+        "effort": "medium"
+      },
+      "deep": {
+        "model": "test-pi-deep",
+        "effort": "high"
+      }
+    },
+    "kimi": {
+      "fast": {
+        "model": "test-kimi-fast"
+      },
+      "standard": {
+        "model": "test-kimi-standard"
+      },
+      "deep": {
+        "model": "test-kimi-deep"
+      }
+    },
+    "amp": {
+      "fast": {
+        "model": "low"
+      },
+      "standard": {
+        "model": "medium"
+      },
+      "deep": {
+        "model": "high"
+      }
+    },
+    "commandcode": {
+      "fast": {
+        "model": "test-commandcode-fast"
+      },
+      "standard": {
+        "model": "test-commandcode-standard"
+      },
+      "deep": {
+        "model": "test-commandcode-deep"
+      }
+    },
+    "antigravity": {
+      "fast": {
+        "model": "test-antigravity-fast"
+      },
+      "standard": {
+        "model": "test-antigravity-standard"
+      },
+      "deep": {
+        "model": "test-antigravity-deep"
+      }
+    }
+  },
+  "context_windows": {
+    "test-model": 1000
+  }
+}
