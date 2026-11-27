@@ -101,7 +101,7 @@ The full walkthrough, with engines, profiles and rules, is in [docs/MULTI-AGENT-
 
 `guard-default-branch` blocks direct pushes and force pushes to `main`, `master`, `dev`, `develop`, `staging`, `trunk`, and the remote default branch. Editing and committing are never blocked, and feature branches can be pushed and force-pushed with `--force-with-lease`. See the [orchestrator-first workflow](docs/ORCHESTRATOR-FIRST.md) for task branches, approval, and GitHub rules.
 
-- *Git*: the global `pre-push` hook (`git/.config/git/hooks`) checks the actual remote refs; `pre-commit` only scans for secrets. Repo-local hooks still run through it.
+- *Git*: the global `pre-push` hook (`git/.config/git/hooks`) checks the actual remote refs when an AI agent runs the push (detected from env vars such as `CLAUDECODE`, `AI_AGENT`, `CODEX_THREAD_ID`, `OPENCODE`, `CREW_MANAGED`). A push you type yourself is never blocked. `pre-commit` only scans for secrets. Repo-local hooks still run through it.
 - *Claude Code*: a `PreToolUse` hook on Bash blocks any `git push` that updates or deletes a protected branch (`HEAD:main`, `+x:main`, `--delete main`, `--all`, `git -C`, `cd ... &&`).
 
 `./setup.sh` installs it into `~/.claude/settings.json` (a backup is kept); or run `guard-default-branch install-claude-hook`.

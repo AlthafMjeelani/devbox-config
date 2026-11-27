@@ -99,8 +99,51 @@ describe("git hooks", () => {
     expect(sh('git commit -q --allow-empty -m "chore: x"', dir, env).code).toBe(0);
     expect(readFileSync(resolve(dir, "chained.txt"), "utf8").trim()).toBe("ran");
   });
-  test("commit-msg requires a Conventional Commits subject", () => {
-    const { dir, env } = withHooks("feat/msg");
+  const agentVars = ["CREW_MANAGED", "CLAUDECODE", "AI_AGENT", "CODEX_THREAD_ID", "CODEX_SANDBOX", "CODEX_CI", "OPENCODE", "GEMINI_CLI", "AMP_THREAD_ID", "AMP_CURRENT_THREAD_ID"];
+  const human = Object.fromEntries(agentVars.map((v) => [v, ""]));
+  function withRemote(branch: string) {
+    const r = withHooks(branch);
+    const remote = mkdtempSync(resolve(root, "remote-"));
+    sh("git init -q --bare .", remote);
+    sh(`git remote add origin ${remote}`, r.dir);
+    return r;
+  }
+  test("pre-push lets a person push protected branches by hand", () => {
+    for (const b of ["main", "dev", "staging"]) {
+      const { dir, env } = withRemote(b);
+      expect([b, sh(`git push -q origin ${b}`, dir, { ...env, ...human }).code]).toEqual([b, 0]);
+    }
+  });
+  test("pre-push blocks agents from pushing protected branches", () => {
+    for (const v of ["CLAUDECODE", "AI_AGENT", "CODEX_THREAD_ID", "OPENCODE"]) {
+      const { dir, env } = withRemote("dev");
+      const r = sh("git push -q origin dev", dir, { ...env, ...human, [v]: "1" });
+      expect([v, r.code]).not.toEqual([v, 0]);
+      expect(r.err).toContain("protected branch dev");
+    }
+  });
+  test("pre-push lets agents push feature branches and honours the overrides", () => {
+    const { dir, env } = withRemote("feat/p");
+    expect(sh("git push -q origin feat/p", dir, { ...env, ...human, CLAUDECODE: "1" }).code).toBe(0);
+    const m = withRemote("main");
+    expect(sh("git push -q origin main", m.dir, { ...m.env, ...human, CLAUDECODE: "1", ALLOW_DEFAULT_BRANCH: "1" }).code).toBe(0);
+  });
+  test("pre-push blocks delegated workers from pushing anything", () => {
+    const { dir, env } = withRemote("feat/w");
+    const r = sh("git push -q origin feat/w", dir, { ...env, ...human, CREW_MANAGED: "1" });
+    expect(r.code).not.toBe(0);
+    expect(r.err).toContain("delegated workers cannot push");
+  });
+  test("commit-msg never blocks a person's own commit message", () => {
+    const { dir, env } = withHooks("feat/manual");
+    for (const m of ["fix:android gradle version update", "updated stuff"]) {
+      expect([m, sh(`git commit -q --allow-empty -m '${m}'`, dir, { ...env, ...human }).code]).toEqual([m, 0]);
+    }
+  });
+  test("commit-msg requires a Conventional Commits subject from agents", () => {
+    const hooked = withHooks("feat/msg");
+    const dir = hooked.dir;
+    const env = { ...hooked.env, ...human, CLAUDECODE: "1" };
     for (const ok of ["feat: add x", "fix(auth): reject expired sessions", "chore!: drop node 18", "Revert \"feat: add x\"", "fixup! feat: add x"]) {
       expect([ok, sh(`git commit -q --allow-empty -m '${ok}'`, dir, env).code]).toEqual([ok, 0]);
     }

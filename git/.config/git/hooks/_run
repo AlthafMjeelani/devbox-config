@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # Global git hook runner. Every hook name below is a symlink to this file.
 # 1) pre-commit scans the staged diff for secrets with gitleaks when it is installed.
-# 2) commit-msg requires a Conventional Commits subject (feat:, fix(scope):, chore!: ...).
+# 2) commit-msg requires a Conventional Commits subject (feat:, fix(scope):, chore!: ...), but only for
+#    AI agents (guard-default-branch agent-session); commits you make by hand are never blocked.
 #    Merge, revert, fixup! and squash! messages pass. Per repo opt-out: git config devbox.allowAnyCommitMessage true
 # 3) Then it runs the repo's own hook from .git/hooks, because a global core.hooksPath would otherwise hide it.
 # Skip all of it once with: git commit --no-verify
 hook="$(basename "$0")"
+guard="$(command -v guard-default-branch 2>/dev/null || true)"
+[ -n "$guard" ] || guard="$HOME/.local/bin/guard-default-branch"
 
 if [ "$hook" = pre-push ]; then
-  guard="$(command -v guard-default-branch 2>/dev/null || true)"
-  [ -n "$guard" ] || guard="$HOME/.local/bin/guard-default-branch"
   if [ -x "$guard" ]; then
     # Buffer the ref updates for both the global guard and the repo's local hook.
     updates="$(cat)" || exit 1
@@ -32,7 +33,7 @@ if [ "$hook" = pre-commit ]; then
   fi
 fi
 
-if [ "$hook" = commit-msg ] && [ -n "${1:-}" ] && [ -f "$1" ]; then
+if [ "$hook" = commit-msg ] && [ -n "${1:-}" ] && [ -f "$1" ] && [ -x "$guard" ] && "$guard" agent-session; then
   if [ "$(git config --get devbox.allowAnyCommitMessage 2>/dev/null || true)" != true ]; then
     subject="$(grep -v '^#' "$1" | sed -n '/[^[:space:]]/{p;q;}')"
     types='feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert'

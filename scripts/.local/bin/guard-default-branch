@@ -6,9 +6,11 @@
 #   guard-default-branch claude-push-hook     Claude Code PreToolUse hook for Bash: exits 2 (block) when a git push
 #                                             targets (or deletes) a protected branch.
 #   guard-default-branch install-claude-hook  Merge the push hook into ~/.claude/settings.json (idempotent, keeps a backup).
+#   guard-default-branch agent-session        Exit 0 when an AI agent or delegated worker is running this command.
 #
 # Protected: main, master, develop, trunk, and the repo's own default branch (origin/HEAD).
-# Dev and staging are also protected. pre-push checks the actual remote refs.
+# Dev and staging are also protected. pre-push checks the actual remote refs, but only when an AI agent
+# runs the push (agent_session below); a person pushing by hand is never blocked.
 # Allow on purpose:  ALLOW_DEFAULT_BRANCH=1 <command>      one time
 #                    git config devbox.allowDefaultBranch true   for one repo (for example your dotfiles)
 set -euo pipefail
@@ -18,6 +20,15 @@ protected() {
   case "$branch" in main|master|dev|develop|staging|trunk) return 0 ;; esac
   default="$(git -C "$dir" symbolic-ref --short -q "refs/remotes/$remote/HEAD" 2>/dev/null || true)"
   [ -n "$default" ] && [ "$branch" = "${default#"$remote/"}" ]
+}
+
+# True when the push comes from an AI coding agent or a delegated worker, judged by the env vars they set.
+agent_session() {
+  local v
+  for v in CREW_MANAGED CLAUDECODE AI_AGENT CODEX_THREAD_ID CODEX_SANDBOX CODEX_CI OPENCODE GEMINI_CLI AMP_THREAD_ID AMP_CURRENT_THREAD_ID; do
+    [ -n "${!v:-}" ] && return 0
+  done
+  return 1
 }
 
 allowed() {
@@ -142,6 +153,7 @@ case "${1:-}" in
       echo "Blocked: delegated workers cannot push." >&2
       exit 1
     fi
+    agent_session || exit 0   # manual pushes are always allowed
     while read -r _ _ remote_ref _; do
       case "$remote_ref" in
         refs/heads/*)
@@ -153,8 +165,9 @@ case "${1:-}" in
       esac
     done
     ;;
+  agent-session) agent_session ;;
   claude-push-hook) claude_push_hook ;;
   install-claude-hook) install_claude_hook ;;
-  -h|--help|help|"") sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//' ;;
+  -h|--help|help|"") sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//' ;;
   *) echo "unknown command: $1 (try --help)" >&2; exit 2 ;;
 esac

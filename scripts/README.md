@@ -46,7 +46,7 @@ Exits 1 on any FAIL (tracked `.env`, not ignored, ignored example, real-looking 
 
 ## guard-default-branch - no direct pushes to main
 
-Blocks direct and force pushes to `main`, `master`, `develop`, `trunk`, `dev`, `staging` and a repo's default branch. Editing and committing are never blocked. Used by the global Git `pre-push` hook and one Claude Code `PreToolUse` Bash hook.
+Blocks direct and force pushes to `main`, `master`, `develop`, `trunk`, `dev`, `staging` and a repo's default branch. Editing and committing are never blocked, and neither are pushes you run by hand: the Git hook only blocks when it detects an AI agent session. Used by the global Git `pre-push` hook and one Claude Code `PreToolUse` Bash hook.
 
 ```bash
 guard-default-branch check-branch <name>    # exit 1 if <name> is protected
